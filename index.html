@@ -776,6 +776,7 @@ body.focus-mode #focus-mode-btn{
     <button id="focus-mode-btn" onclick="toggleFocusMode()" title="Modo Foco — esconde menus para tela cheia">🎯 Foco</button>
     <button class="btn-export-top btn-top-action" onclick="openExportGeral()" title="Compartilhe informações do curso" data-hint="Compartilhe informações do curso">📤 Compartilhar</button>
     <button class="btn-export-top btn-top-action" style="background:#185FA5;color:#fff" onclick="openBackup()" title="Exporte ou importe backup do curso" data-hint="Exporte ou importe backup do curso">🔄 Backup</button>
+    <span class="badge" id="hdr-user-badge" style="background:transparent;border:1.5px solid rgba(255,255,255,.25);color:#ccc;font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Conta conectada">👤</span>
     <button class="btn-export-top btn-top-action" id="hdr-logout-btn" style="background:#3a3a38;color:#fff" onclick="authLogout()" title="Sair da conta">🚪 Sair</button>
   </div>
 </div>
@@ -1298,9 +1299,13 @@ function authGate(){
     if(user){
       currentUser = user;
       hideLoginScreen();
+      const badge=document.getElementById('hdr-user-badge');
+      if(badge){ badge.textContent='👤 '+(user.email||'conectado'); badge.title='Conectado como '+(user.email||''); }
       await init();
     } else {
       currentUser = null;
+      const badge=document.getElementById('hdr-user-badge');
+      if(badge){ badge.textContent='👤'; badge.title='Conta conectada'; }
       showLoginScreen();
     }
   });
@@ -4513,6 +4518,70 @@ function pomoClampToViewport(w){
   }
 }
 
+// ── POMODORO DRAG (ícone flutuante) ─────────────────────────────
+let _pomoFabDragInited = false;
+function pomoInitFabDrag(){
+  const fab = document.getElementById('pomo-fab');
+  if(!fab || _pomoFabDragInited) return;
+  _pomoFabDragInited = true;
+
+  let dragging=false, moved=false, pointerId=null;
+  let startX=0, startY=0, origLeft=0, origTop=0;
+
+  // Restaurar posição salva (se o usuário já arrastou antes)
+  if(state.pomoFabPos && state.pomoFabPos.left && state.pomoFabPos.top){
+    fab.style.position='fixed';
+    fab.style.left=state.pomoFabPos.left;
+    fab.style.top=state.pomoFabPos.top;
+    fab.style.right='auto';
+    fab.style.bottom='auto';
+    requestAnimationFrame(()=>{
+      const vw=window.innerWidth, vh=window.innerHeight;
+      const curLeft=parseInt(fab.style.left)||0, curTop=parseInt(fab.style.top)||0;
+      fab.style.left=Math.max(8, Math.min(curLeft, vw-fab.offsetWidth-8))+'px';
+      fab.style.top =Math.max(8, Math.min(curTop,  vh-fab.offsetHeight-8))+'px';
+    });
+  }
+
+  fab.addEventListener('pointerdown', function(e){
+    fab.setPointerCapture(e.pointerId);
+    pointerId=e.pointerId;
+    const rect=fab.getBoundingClientRect();
+    fab.style.position='fixed';
+    fab.style.left=rect.left+'px';
+    fab.style.top=rect.top+'px';
+    fab.style.right='auto';
+    fab.style.bottom='auto';
+    origLeft=rect.left; origTop=rect.top;
+    startX=e.clientX; startY=e.clientY;
+    dragging=true; moved=false;
+  });
+  fab.addEventListener('pointermove', function(e){
+    if(!dragging || e.pointerId!==pointerId) return;
+    const dx=e.clientX-startX, dy=e.clientY-startY;
+    if(!moved && (Math.abs(dx)>4 || Math.abs(dy)>4)) moved=true;
+    if(!moved) return;
+    e.preventDefault();
+    const newL=Math.max(8, Math.min(origLeft+dx, window.innerWidth - fab.offsetWidth - 8));
+    const newT=Math.max(8, Math.min(origTop +dy, window.innerHeight - fab.offsetHeight - 8));
+    fab.style.left=newL+'px';
+    fab.style.top=newT+'px';
+  });
+  function endDrag(e){
+    if(!dragging) return;
+    dragging=false; pointerId=null;
+    if(moved){
+      state.pomoFabPos={left:fab.style.left, top:fab.style.top};
+      save();
+    } else {
+      // Foi um clique (sem arrastar): abre/fecha o widget do Pomodoro
+      togglePomoWidget();
+    }
+  }
+  fab.addEventListener('pointerup', endDrag);
+  fab.addEventListener('pointercancel', function(){ dragging=false; pointerId=null; });
+}
+
 function togglePomoWidget(){
   _pomo.widgetOpen = !_pomo.widgetOpen;
   const w = document.getElementById('pomo-widget');
@@ -4835,9 +4904,10 @@ function getSessionsPerDay(days=7){
     const ds=d.toISOString().split('T')[0];
     const dayLogs=state.logs.filter(l=>l.date===ds);
     const hours=dayLogs.reduce((s,l)=>s+(parseFloat(l.hours)||0),0);
+    const ddmm=String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');
     result.push({
       date:ds,
-      label: i===0?'Hoje': i===1?'Ontem': dayNames[d.getDay()],
+      label: i===0?'Hoje ('+ddmm+')': i===1?'Ontem': dayNames[d.getDay()],
       sessions:dayLogs.length,
       hours,
       isToday: i===0,
@@ -5517,6 +5587,7 @@ async function init(){
     const focusBtn=document.getElementById('pomo-m-focus'); if(focusBtn) focusBtn.textContent=POMO_MODES.focus.label;
     if(_pomo.mode==='focus'){ _pomo.remaining=state.pomoFocusMins*60; _pomo.total=state.pomoFocusMins*60; }
   }
+  pomoInitFabDrag();
 
   if(isMobile()){
     document.querySelector('.desktop-wrap').style.display='none';
@@ -6043,7 +6114,7 @@ authGate();
 <button id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Voltar ao topo">↑</button>
 
   <!-- POMODORO FAB + WIDGET — sempre último no DOM para máximo z-index -->
-  <button id="pomo-fab" onclick="togglePomoWidget()" title="Pomodoro Timer">🍅</button>
+  <button id="pomo-fab" title="Pomodoro Timer (arraste para mover)">🍅</button>
   <div id="pomo-widget-wrap">
     <div id="pomo-widget">
       <div id="pomo-drag-handle" class="pomo-header">

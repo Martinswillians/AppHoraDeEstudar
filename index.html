@@ -198,6 +198,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .form-field{display:flex;flex-direction:column;gap:3px}
 .form-field label{font-size:11px;font-weight:600;color:#888;text-transform:uppercase}
 .form-field input,.form-field select,.form-field textarea{font-size:13px;padding:7px 10px;border:1px solid #e8e6e0;border-radius:8px;background:#faf9f7;color:#1a1a18;font-family:inherit;outline:none}
+.multi-select-wrap{position:relative}
+.multi-select-btn{width:100%;text-align:left;cursor:pointer;font-size:13px;padding:7px 10px;border:1px solid #e8e6e0;border-radius:8px;background:#faf9f7;color:#1a1a18;font-family:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.multi-select-panel{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid #e8e6e0;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:220px;overflow-y:auto;z-index:60;padding:6px}
+.multi-select-panel label{display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:12.5px;color:#333;cursor:pointer;border-radius:6px}
+.multi-select-panel label:hover{background:#f5f4f1}
+.multi-select-panel input{margin:0;flex-shrink:0}
 .form-field.full{grid-column:1/-1}
 .form-field textarea{resize:vertical;min-height:65px;line-height:1.5}
 .btn-log{font-size:12px;font-weight:700;padding:8px 20px;background:#1a1a18;color:#fff;border:none;border-radius:8px;cursor:pointer}
@@ -646,6 +652,15 @@ body.focus-mode #focus-mode-btn{
 .pomo-close:hover{color:#fff}
 /* Mode tabs */
 .pomo-modes{display:flex;gap:4px;padding:10px 14px 6px}
+.pomo-custom-row{padding:0 14px 8px}
+.pomo-custom-toggle{width:100%;background:none;border:none;color:#888;font-size:11px;font-weight:600;cursor:pointer;padding:2px 0;text-align:left}
+.pomo-custom-toggle:hover{color:#555}
+#pomo-custom-panel{display:flex;align-items:flex-end;gap:8px;margin-top:6px;padding:8px;background:#f7f6f3;border-radius:8px}
+.pomo-custom-fields{display:flex;gap:6px;flex:1}
+.pomo-custom-fields div{display:flex;flex-direction:column;gap:2px}
+.pomo-custom-fields label{font-size:9px;font-weight:700;color:#999;text-transform:uppercase}
+.pomo-custom-fields input{width:56px;font-size:13px;padding:5px 6px;border:1px solid #e0ddd7;border-radius:6px;background:#fff}
+.pomo-custom-apply{background:#185FA5;color:#fff;border:none;border-radius:6px;padding:7px 10px;font-size:11px;font-weight:700;cursor:pointer}
 .pomo-mode-btn{flex:1;padding:6px 4px;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.06);color:#888;transition:all .15s}
 .pomo-mode-btn.active{background:rgba(239,68,68,.25);color:#f87171}
 .pomo-mode-btn.active.break-mode{background:rgba(29,158,117,.25);color:#34d399}
@@ -1072,10 +1087,20 @@ body.focus-mode #focus-mode-btn{
     <div id="ctab-diario" class="ctab">
       <div class="log-form">
         <h3>Registrar Sessão</h3>
+        <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#444;margin-bottom:12px;cursor:pointer">
+          <input type="checkbox" id="d-auto-log-toggle" onchange="setAutoLogLessons(this.checked)"/>
+          Auto-registrar aulas concluídas no Diário
+        </label>
         <div class="form-grid">
           <div class="form-field"><label>Data</label><input type="date" id="d-log-date"/></div>
           <div class="form-field"><label>Horas</label><input type="number" id="d-log-hours" min="0.5" max="12" step="0.5" placeholder="1.5" value="1"/></div>
-          <div class="form-field"><label>Seção</label><select id="d-log-sec"><option value="">Selecione...</option></select></div>
+          <div class="form-field">
+            <label>Seção</label>
+            <div class="multi-select-wrap">
+              <button type="button" id="d-log-sec-btn" class="multi-select-btn" onclick="toggleSecPicker('d')">Selecione...</button>
+              <div id="d-log-sec-panel" class="multi-select-panel" style="display:none"></div>
+            </div>
+          </div>
           <div class="form-field full"><label>Anotação</label><textarea id="d-log-desc" placeholder="O que você estudou?"></textarea></div>
         </div>
         <button class="btn-log" onclick="addLog()">Registrar ↗</button>
@@ -1139,11 +1164,21 @@ body.focus-mode #focus-mode-btn{
   <div id="ms-diario" class="m-screen" style="height:100%;overflow-y:auto;padding:12px;display:none">
     <div class="log-form" style="margin-bottom:12px">
       <h3>Registrar Sessão</h3>
+      <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#444;margin-bottom:10px;cursor:pointer">
+        <input type="checkbox" id="m-auto-log-toggle" onchange="setAutoLogLessons(this.checked)"/>
+        Auto-registrar aulas concluídas no Diário
+      </label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         <div class="form-field"><label>Data</label><input type="date" id="m-log-date"/></div>
         <div class="form-field"><label>Horas</label><input type="number" id="m-log-hours" min="0.5" max="12" step="0.5" placeholder="1.5" value="1"/></div>
       </div>
-      <div class="form-field" style="margin-bottom:8px"><label>Seção</label><select id="m-log-sec"><option value="">Selecione...</option></select></div>
+      <div class="form-field" style="margin-bottom:8px">
+        <label>Seção</label>
+        <div class="multi-select-wrap">
+          <button type="button" id="m-log-sec-btn" class="multi-select-btn" onclick="toggleSecPicker('m')">Selecione...</button>
+          <div id="m-log-sec-panel" class="multi-select-panel" style="display:none"></div>
+        </div>
+      </div>
       <div class="form-field" style="margin-bottom:10px"><label>Anotação</label><textarea id="m-log-desc" style="min-height:65px;resize:none;line-height:1.5" placeholder="O que você estudou?"></textarea></div>
       <button class="btn-log" style="width:100%;padding:11px" onclick="mAddLog()">Registrar ↗</button>
     </div>
@@ -2057,13 +2092,81 @@ function highlightHTML(text,q){
 // -- TOGGLE DONE ---------------------------------------------
 function toggleDone(secId,n){
   const k=lk(secId,n); state.done[k]=!state.done[k];
-  if(state.done[k]){ recordActivity(); if(state.review[k]) delete state.review[k]; } // concluída limpa revisão
-  else save();
+  if(state.done[k]){
+    recordActivity(); if(state.review && state.review[k]) delete state.review[k]; // concluída limpa revisão
+    autoLogLesson(secId,n);
+  }
+  else { autoUnlogLesson(secId,n); save(); }
   dRenderSidebar(); updateStats(); dRenderOverview();
   if(activeKey===k) dRenderLesson(secId,n);
   mRenderSections(); mUpdateProgList();
   const brand=document.getElementById('hdr-brand-txt');
   if(brand) brand.textContent='Tracker de Estudos 🚀';
+}
+
+// Converte durações como "5m", "1h20m", "1h" em horas decimais
+function parseDurationToHours(dur){
+  if(!dur) return 0;
+  let h=0,m=0;
+  const hMatch=String(dur).match(/(\d+)\s*h/); if(hMatch) h=parseInt(hMatch[1]);
+  const mMatch=String(dur).match(/(\d+)\s*m/); if(mMatch) m=parseInt(mMatch[1]);
+  if(!hMatch && !mMatch){ const n=parseFloat(dur); if(!isNaN(n)) m=n; } // fallback: número puro = minutos
+  return h + m/60;
+}
+
+// Registra automaticamente, no Diário de hoje, a aula que acabou de ser concluída.
+// Todas as aulas concluídas no mesmo dia e na mesma seção são somadas num único
+// registro (soma o tempo e junta os títulos das aulas em "Anotação").
+function autoLogLesson(secId,n){
+  if(!state.autoLogLessons) return;
+  const sec=SECTIONS.find(s=>s.id===secId); if(!sec) return;
+  const lesson=sec.lessons.find(l=>l.n===n); if(!lesson) return;
+  const k=lk(secId,n);
+  const title=state.customTitles[k]||lesson.t;
+  const hours=parseDurationToHours(lesson.d);
+  const today=todayStr();
+
+  if(!state.activityDays) state.activityDays={};
+  state.activityDays[today]=true;
+
+  let entry=state.logs.find(l=>l.date===today && l.sec===secId && l.autoLessons);
+  if(entry){
+    entry.lessonKeys=entry.lessonKeys||[];
+    if(!entry.lessonKeys.includes(k)){
+      entry.lessonKeys.push(k);
+      entry.hours=Math.round(((parseFloat(entry.hours)||0)+hours)*100)/100;
+      entry.lessonTitles=entry.lessonTitles||[];
+      if(!entry.lessonTitles.includes(title)) entry.lessonTitles.push(title);
+      entry.desc=entry.lessonTitles.map(t=>'- '+t).join(' ');
+    }
+  } else {
+    entry={id:Date.now(),date:today,hours:Math.round(hours*100)/100,sec:secId,secs:[secId],
+      desc:'- '+title,autoLessons:true,lessonKeys:[k],lessonTitles:[title]};
+    state.logs.unshift(entry);
+  }
+  save(); updateStats(); renderLogList(); mRenderLog();
+}
+
+// Remove a aula do registro automático do dia (quando o usuário desmarca uma aula concluída)
+function autoUnlogLesson(secId,n){
+  if(!state.autoLogLessons) return;
+  const k=lk(secId,n);
+  const today=todayStr();
+  const entry=state.logs.find(l=>l.date===today && l.sec===secId && l.autoLessons && l.lessonKeys && l.lessonKeys.includes(k));
+  if(!entry) return;
+  const sec=SECTIONS.find(s=>s.id===secId);
+  const lesson=sec&&sec.lessons.find(l=>l.n===n);
+  const title=lesson?(state.customTitles[k]||lesson.t):null;
+  const hours=lesson?parseDurationToHours(lesson.d):0;
+  entry.lessonKeys=entry.lessonKeys.filter(lk2=>lk2!==k);
+  if(title) entry.lessonTitles=(entry.lessonTitles||[]).filter(t=>t!==title);
+  entry.hours=Math.max(0,Math.round(((parseFloat(entry.hours)||0)-hours)*100)/100);
+  if(!entry.lessonKeys.length){
+    state.logs=state.logs.filter(l=>l.id!==entry.id);
+  } else {
+    entry.desc=(entry.lessonTitles||[]).map(t=>'- '+t).join(' ');
+  }
+  save(); updateStats(); renderLogList(); mRenderLog();
 }
 
 function toggleReview(secId,n){
@@ -2588,10 +2691,61 @@ function deleteGCode(k,id){
 }
 
 // -- DIÁRIO ---------------------------------------------------
+// ── SELETOR MÚLTIPLO DE SEÇÃO (Diário) ──────────────────────────
+let _logSecSel = { d: [], m: [] }; // seções marcadas por formulário (desktop/mobile)
+
 function populateLogSelects(){
-  const opts='<option value="">Selecione...</option>'+SECTIONS.map(s=>`<option value="${s.id}">S${s.num}: ${s.title}</option>`).join('');
-  ['d-log-sec','m-log-sec'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=opts;});
+  // Reseta a seleção quando a lista de seções do curso muda
+  _logSecSel.d = _logSecSel.d.filter(id=>SECTIONS.some(s=>s.id===id));
+  _logSecSel.m = _logSecSel.m.filter(id=>SECTIONS.some(s=>s.id===id));
+  updateSecPickerLabel('d'); updateSecPickerLabel('m');
+  const dToggle=document.getElementById('d-auto-log-toggle'); if(dToggle) dToggle.checked=!!state.autoLogLessons;
+  const mToggle=document.getElementById('m-auto-log-toggle'); if(mToggle) mToggle.checked=!!state.autoLogLessons;
 }
+function toggleSecPicker(prefix){
+  const panel=document.getElementById(prefix+'-log-sec-panel');
+  if(!panel) return;
+  const isOpen=panel.style.display!=='none';
+  document.querySelectorAll('.multi-select-panel').forEach(p=>p.style.display='none');
+  if(!isOpen){
+    renderSecPicker(prefix);
+    panel.style.display='block';
+    document.addEventListener('click', _closeSecPickerOutside);
+  }
+}
+function _closeSecPickerOutside(e){
+  if(e.target.closest('.multi-select-wrap')) return;
+  document.querySelectorAll('.multi-select-panel').forEach(p=>p.style.display='none');
+  document.removeEventListener('click', _closeSecPickerOutside);
+}
+function renderSecPicker(prefix){
+  const panel=document.getElementById(prefix+'-log-sec-panel');
+  if(!panel) return;
+  const sel=_logSecSel[prefix];
+  panel.innerHTML=SECTIONS.map(s=>`<label><input type="checkbox" value="${s.id}" ${sel.includes(s.id)?'checked':''} onchange="toggleSecSelection('${prefix}','${s.id}',this.checked)"/> S${s.num}: ${s.title}</label>`).join('');
+}
+function toggleSecSelection(prefix,id,checked){
+  const sel=_logSecSel[prefix];
+  if(checked){ if(!sel.includes(id)) sel.push(id); }
+  else { const i=sel.indexOf(id); if(i>=0) sel.splice(i,1); }
+  updateSecPickerLabel(prefix);
+}
+function updateSecPickerLabel(prefix){
+  const btn=document.getElementById(prefix+'-log-sec-btn');
+  if(!btn) return;
+  const sel=_logSecSel[prefix];
+  if(!sel.length){ btn.textContent='Selecione...'; return; }
+  btn.textContent=sel.map(id=>{ const s=SECTIONS.find(x=>x.id===id); return s?('S'+s.num):id; }).join(', ');
+}
+function resetSecPicker(prefix){ _logSecSel[prefix]=[]; updateSecPickerLabel(prefix); }
+
+function setAutoLogLessons(checked){
+  state.autoLogLessons=checked;
+  const dToggle=document.getElementById('d-auto-log-toggle'); if(dToggle) dToggle.checked=checked;
+  const mToggle=document.getElementById('m-auto-log-toggle'); if(mToggle) mToggle.checked=checked;
+  save();
+}
+
 // Destaca um campo obrigatório vazio e mostra aviso, em vez de falhar silenciosamente
 function markLogFieldError(fieldEl,msgId,msgText){
   if(fieldEl){
@@ -2615,15 +2769,16 @@ function addLog(){
   const hoursEl=document.getElementById('d-log-hours');
   const date=dateEl?.value;
   const hours=hoursEl?.value;
-  const sec=document.getElementById('d-log-sec')?.value;
+  const secs=[..._logSecSel.d];
   const desc=document.getElementById('d-log-desc')?.value.trim();
   if(!date){ markLogFieldError(dateEl,'d-log-err','Informe a data da sessão.'); return; }
   if(!hours){ markLogFieldError(hoursEl,'d-log-err','Informe as horas estudadas para registrar a sessão.'); return; }
-  state.logs.unshift({id:Date.now(),date,hours:parseFloat(hours),sec,desc});
+  state.logs.unshift({id:Date.now(),date,hours:parseFloat(hours),sec:secs[0]||'',secs,desc});
   // Registrar atividade no dia da sessão (pode ser retroativo)
   if(!state.activityDays) state.activityDays={};
   state.activityDays[date]=true;
   document.getElementById('d-log-hours').value='1'; document.getElementById('d-log-desc').value='';
+  resetSecPicker('d');
   save(); updateStats(); renderLogList(); updateStreakUI();
   // Atualizar overview com novos dados (gráfico + metas)
   if(document.getElementById('activity-chart')) dRenderOverview();
@@ -2633,15 +2788,16 @@ function mAddLog(){
   const hoursEl=document.getElementById('m-log-hours');
   const date=dateEl?.value;
   const hours=hoursEl?.value;
-  const sec=document.getElementById('m-log-sec')?.value;
+  const secs=[..._logSecSel.m];
   const desc=document.getElementById('m-log-desc')?.value.trim();
   if(!date){ markLogFieldError(dateEl,'m-log-err','Informe a data da sessão.'); return; }
   if(!hours){ markLogFieldError(hoursEl,'m-log-err','Informe as horas estudadas para registrar a sessão.'); return; }
-  state.logs.unshift({id:Date.now(),date,hours:parseFloat(hours),sec,desc});
+  state.logs.unshift({id:Date.now(),date,hours:parseFloat(hours),sec:secs[0]||'',secs,desc});
   // Registrar atividade no dia da sessão
   if(!state.activityDays) state.activityDays={};
   state.activityDays[date]=true;
   document.getElementById('m-log-hours').value='1'; document.getElementById('m-log-desc').value='';
+  resetSecPicker('m');
   save(); updateStats(); renderLogList(); mRenderLog(); updateStreakUI();
 }
 function formatHoursHM(hours){
@@ -2651,18 +2807,39 @@ function formatHoursHM(hours){
   const mm=totalMin%60;
   return hh+':'+String(mm).padStart(2,'0');
 }
+// Ordena as sessões do Diário por data (mais recente primeiro), independente da
+// ordem em que foram registradas. Em caso de mesma data, o registro criado por
+// último aparece primeiro.
+function getSortedLogs(){
+  return [...state.logs].sort((a,b)=>{
+    if(a.date!==b.date) return a.date < b.date ? 1 : -1; // datas no formato YYYY-MM-DD comparam como string
+    return (b.id||0)-(a.id||0);
+  });
+}
+// Rótulo da(s) seção(ões) de um registro do Diário — suporta seleção múltipla (l.secs)
+function logSectionLabel(l, sm){
+  if(l.secs && l.secs.length){
+    const titles=l.secs.map(id=>{ const s=sm[id]; return s?('S'+s.num+': '+s.title):null; }).filter(Boolean);
+    if(!titles.length) return 'Estudo geral';
+    if(l.secs.length===1) return titles[0];
+    const codes=l.secs.map(id=>{ const s=sm[id]; return s?('S'+s.num):id; }).join(', ');
+    return codes+' — '+l.secs.length+' seções';
+  }
+  const sec=l.sec&&sm[l.sec];
+  return sec?'S'+sec.num+': '+sec.title:'Estudo geral';
+}
 function renderLogList(){
   const target=document.getElementById('d-log-list'); if(!target) return;
   if(!state.logs.length){target.innerHTML='<div class="empty">Nenhuma sessão ainda.</div>';return;}
   const months=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const sm={}; SECTIONS.forEach(s=>sm[s.id]=s);
-  target.innerHTML=state.logs.map(l=>{
-    const [y,m,d]=l.date.split('-'); const sec=l.sec&&sm[l.sec];
+  target.innerHTML=getSortedLogs().map(l=>{
+    const [y,m,d]=l.date.split('-');
     return `<div class="log-card">
       <div class="log-date-blk"><div class="log-day">${d}</div><div class="log-month">${months[parseInt(m)-1]}</div></div>
       <div class="log-sep"></div>
       <div class="log-body">
-        <div class="log-title-txt">${sec?'S'+sec.num+': '+sec.title:'Estudo geral'}</div>
+        <div class="log-title-txt">${logSectionLabel(l,sm)}</div>
         ${l.desc?`<div class="log-desc-txt">${l.desc}</div>`:''}
       </div>
       <div style="text-align:right;flex-shrink:0"><div class="log-h">${formatHoursHM(l.hours)}h</div><div class="log-hl">estudadas</div></div>
@@ -3501,13 +3678,13 @@ function mRenderLog(){
   if(!state.logs.length){c.innerHTML='<div class="empty">Nenhuma sessão ainda.</div>';return;}
   const months=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const sm={}; SECTIONS.forEach(s=>sm[s.id]=s);
-  c.innerHTML=state.logs.map(l=>{
-    const [y,m,d]=l.date.split('-'); const sec=l.sec&&sm[l.sec];
+  c.innerHTML=getSortedLogs().map(l=>{
+    const [y,m,d]=l.date.split('-');
     return `<div class="log-card" style="margin-bottom:8px">
       <div class="log-date-blk"><div class="log-day">${d}</div><div class="log-month">${months[parseInt(m)-1]}</div></div>
       <div class="log-sep"></div>
       <div class="log-body">
-        <div class="log-title-txt">${sec?'S'+sec.num+': '+sec.title:'Estudo geral'}</div>
+        <div class="log-title-txt">${logSectionLabel(l,sm)}</div>
         ${l.desc?`<div class="log-desc-txt">${l.desc}</div>`:''}
       </div>
       <div style="text-align:right;flex-shrink:0"><div class="log-h">${formatHoursHM(l.hours)}h</div></div>
@@ -4382,6 +4559,39 @@ function setPomoMode(mode){
   pomoRender();
 }
 
+// Permite ajustar a duração do tempo de FOCO/ESTUDO em horas e minutos (além dos 25m padrão)
+function pomoFormatMinLabel(totalMins){
+  const h=Math.floor(totalMins/60), m=totalMins%60;
+  if(h>0 && m>0) return h+'h'+m+'m';
+  if(h>0) return h+'h';
+  return m+'m';
+}
+function pomoToggleCustom(){
+  const panel=document.getElementById('pomo-custom-panel'); if(!panel) return;
+  const open=panel.style.display!=='none';
+  panel.style.display=open?'none':'flex';
+  if(!open){
+    const totalMins=POMO_MODES.focus.mins;
+    const hEl=document.getElementById('pomo-custom-h'), mEl=document.getElementById('pomo-custom-m');
+    if(hEl) hEl.value=Math.floor(totalMins/60);
+    if(mEl) mEl.value=totalMins%60;
+  }
+}
+function pomoApplyCustomFocus(){
+  if(_pomo.running){ alert('Pause o timer antes de ajustar o tempo de estudo.'); return; }
+  const h=parseInt(document.getElementById('pomo-custom-h')?.value)||0;
+  const m=parseInt(document.getElementById('pomo-custom-m')?.value)||0;
+  const totalMins=h*60+m;
+  if(totalMins<=0){ alert('Informe um tempo maior que zero.'); return; }
+  POMO_MODES.focus.mins=totalMins;
+  POMO_MODES.focus.label='🎯 Foco '+pomoFormatMinLabel(totalMins);
+  const btn=document.getElementById('pomo-m-focus'); if(btn) btn.textContent=POMO_MODES.focus.label;
+  state.pomoFocusMins=totalMins;
+  save();
+  if(_pomo.mode==='focus'){ _pomo.remaining=totalMins*60; _pomo.total=totalMins*60; pomoRender(); }
+  const panel=document.getElementById('pomo-custom-panel'); if(panel) panel.style.display='none';
+}
+
 function togglePomo(){
   if(_pomo.running){ pausePomo(); } else { startPomo(); }
 }
@@ -4436,7 +4646,8 @@ function pomoComplete(skipped=false){
     // Som de notificação
     pomoBeep(true);
     // Toast
-    showPomoToast('🎉 Pomodoro concluído! +25min registrado.', '#1D9E75');
+    const focusMinsLabel=pomoFormatMinLabel(POMO_MODES.focus.mins);
+    showPomoToast('🎉 Pomodoro concluído! +'+focusMinsLabel+' registrado.', '#1D9E75');
     // Avançar sessão
     _pomo.session = (_pomo.session % 4) + 1;
     // Sugerir pausa
@@ -4453,15 +4664,16 @@ function pomoComplete(skipped=false){
 }
 
 function pomoAutoLog(){
-  // Registra automaticamente 25min (0.42h) no Diário
+  // Registra automaticamente a duração configurada do Foco (em horas) no Diário
   const today = todayStr();
   const secId = expCtx.secId || (SECTIONS[0]?.id||'');
   const secLabel = SECTIONS.find(s=>s.id===secId)?.title||'';
   const lessonTitle = activeKey ? (state.customTitles[activeKey]||'') : '';
   const desc = '🍅 Pomodoro'+(_pomo.session>1?' #'+_pomo.session:'')+(lessonTitle?' — '+lessonTitle:'');
+  const hours = Math.round((POMO_MODES.focus.mins/60)*100)/100;
   if(!state.activityDays) state.activityDays={};
   state.activityDays[today]=true;
-  state.logs.unshift({id:Date.now(), date:today, hours:0.42, sec:secId, desc});
+  state.logs.unshift({id:Date.now(), date:today, hours, sec:secId, secs:secId?[secId]:[], desc});
   save(); updateStats(); renderLogList(); mRenderLog();
 }
 
@@ -5283,6 +5495,14 @@ async function init(){
   const ldEl=document.getElementById('d-log-date'); if(ldEl) ldEl.value=today;
   populateLogSelects();
 
+  // Restaurar duração personalizada do Pomodoro (se o usuário já ajustou antes)
+  if(state.pomoFocusMins){
+    POMO_MODES.focus.mins=state.pomoFocusMins;
+    POMO_MODES.focus.label='🎯 Foco '+pomoFormatMinLabel(state.pomoFocusMins);
+    const focusBtn=document.getElementById('pomo-m-focus'); if(focusBtn) focusBtn.textContent=POMO_MODES.focus.label;
+    if(_pomo.mode==='focus'){ _pomo.remaining=state.pomoFocusMins*60; _pomo.total=state.pomoFocusMins*60; }
+  }
+
   if(isMobile()){
     document.querySelector('.desktop-wrap').style.display='none';
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
@@ -5820,6 +6040,16 @@ authGate();
         <button class="pomo-mode-btn active" id="pomo-m-focus" onclick="setPomoMode('focus')">🎯 Foco 25m</button>
         <button class="pomo-mode-btn" id="pomo-m-short" onclick="setPomoMode('short')">☕ Pausa 5m</button>
         <button class="pomo-mode-btn" id="pomo-m-long" onclick="setPomoMode('long')">🛋 Pausa 15m</button>
+      </div>
+      <div class="pomo-custom-row">
+        <button type="button" class="pomo-custom-toggle" id="pomo-custom-toggle" onclick="pomoToggleCustom()">⚙️ Ajustar tempo de estudo</button>
+        <div id="pomo-custom-panel" style="display:none">
+          <div class="pomo-custom-fields">
+            <div><label>Horas</label><input type="number" id="pomo-custom-h" min="0" max="12" step="1" value="0"/></div>
+            <div><label>Minutos</label><input type="number" id="pomo-custom-m" min="0" max="59" step="1" value="25"/></div>
+          </div>
+          <button type="button" class="pomo-custom-apply" onclick="pomoApplyCustomFocus()">Aplicar</button>
+        </div>
       </div>
       <div class="pomo-ring-wrap">
         <svg id="pomo-svg" width="140" height="140" viewBox="0 0 140 140">

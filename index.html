@@ -1775,7 +1775,12 @@ const DEFAULT_EXTRA_COURSES = [
 let CUSTOM_COURSES = [];
 let REMOVED_BUILTIN_IDS = []; // ids de cursos-padrão ocultados pelo usuário (carregado 1x no login)
 
-async function saveCourses(){ await cloudSetItem('jt3_courses', JSON.stringify(CUSTOM_COURSES)); }
+let _saveCoursesQueue = Promise.resolve();
+async function saveCourses(){
+  const snapshot = JSON.stringify(CUSTOM_COURSES);
+  _saveCoursesQueue = _saveCoursesQueue.then(()=>cloudSetItem('jt3_courses', snapshot)).catch(e=>console.error('[nuvem] erro na fila de gravação (cursos):', e));
+  return _saveCoursesQueue;
+}
 async function loadCourses(){
   try{
     const d = await cloudGetItem('jt3_courses');
@@ -1828,7 +1833,17 @@ function getCourseById(id){
 }
 
 function stateKey(){ return 'jt3_'+(state.activeCourseId||'java-completo'); }
-async function save(){ await cloudSetItem(stateKey(), JSON.stringify(state)); }
+// Fila de gravações: garante que os saves() cheguem ao Firestore na MESMA ordem em
+// que foram chamados. Sem isso, ao concluir várias aulas rapidamente (cada uma dispara
+// 1-2 saves), as gravações concorrentes podiam terminar fora de ordem e uma versão
+// mais antiga do estado sobrescrever registros mais recentes do Diário.
+let _saveQueue = Promise.resolve();
+async function save(){
+  const snapshot = JSON.stringify(state); // captura o estado JÁ (síncrono, sem race)
+  const key = stateKey();
+  _saveQueue = _saveQueue.then(()=>cloudSetItem(key, snapshot)).catch(e=>console.error('[nuvem] erro na fila de gravação:', e));
+  return _saveQueue;
+}
 // Guarda, numa chave própria (fora do estado por curso), qual foi o último curso ativo,
 // para que ao reabrir o app (em qualquer dispositivo) ele volte para o curso certo (ex: BACEN),
 // não sempre para o Java.

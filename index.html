@@ -738,6 +738,10 @@ body.focus-mode #focus-mode-btn{
       <div style="font-size:18px;font-weight:800;color:#fff">Hora de Estudar</div>
       <div style="font-size:12px;color:#999;margin-top:4px">Entre para sincronizar seus dados na nuvem</div>
     </div>
+    <div id="auth-name-field" style="margin-bottom:12px">
+      <label style="display:block;font-size:11px;font-weight:700;color:#bbb;margin-bottom:5px">NOME</label>
+      <input id="auth-name" type="text" autocomplete="name" placeholder="Como podemos te chamar?" style="width:100%;padding:11px 12px;border-radius:9px;border:1.5px solid #444;background:#1a1a18;color:#fff;font-size:14px;box-sizing:border-box" onkeydown="if(event.key==='Enter')document.getElementById('auth-email').focus()"/>
+    </div>
     <div style="margin-bottom:12px">
       <label style="display:block;font-size:11px;font-weight:700;color:#bbb;margin-bottom:5px">E-MAIL</label>
       <input id="auth-email" type="email" autocomplete="username" placeholder="voce@email.com" style="width:100%;padding:11px 12px;border-radius:9px;border:1.5px solid #444;background:#1a1a18;color:#fff;font-size:14px;box-sizing:border-box" onkeydown="if(event.key==='Enter')document.getElementById('auth-pass').focus()"/>
@@ -777,7 +781,7 @@ body.focus-mode #focus-mode-btn{
     <button id="focus-mode-btn" onclick="toggleFocusMode()" title="Modo Foco — esconde menus para tela cheia">🎯 Foco</button>
     <button class="btn-export-top btn-top-action" onclick="openExportGeral()" title="Compartilhe informações do curso" data-hint="Compartilhe informações do curso">📤 Compartilhar</button>
     <button class="btn-export-top btn-top-action" style="background:#185FA5;color:#fff" onclick="openBackup()" title="Exporte ou importe backup do curso" data-hint="Exporte ou importe backup do curso">🔄 Backup</button>
-    <span class="badge" id="hdr-user-badge" style="background:transparent;border:1.5px solid rgba(255,255,255,.25);color:#ccc;font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Conta conectada">👤</span>
+    <span class="badge" id="hdr-user-badge" onclick="openProfileModal()" style="background:transparent;border:1.5px solid rgba(255,255,255,.25);color:#ccc;font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" title="Clique para editar seu perfil">👤</span>
     <button class="btn-export-top btn-top-action" id="hdr-logout-btn" style="background:#3a3a38;color:#fff" onclick="authLogout()" title="Sair da conta">🚪 Sair</button>
   </div>
 </div>
@@ -1269,6 +1273,7 @@ async function authLogin(){
   authSetLoading(false);
 }
 async function authSignup(){
+  const name=document.getElementById('auth-name').value.trim();
   const email=document.getElementById('auth-email').value.trim();
   const pass=document.getElementById('auth-pass').value;
   const errEl=document.getElementById('auth-err');
@@ -1277,7 +1282,11 @@ async function authSignup(){
   if(pass.length<6){ if(errEl) errEl.textContent='A senha deve ter pelo menos 6 caracteres.'; return; }
   authSetLoading(true);
   try{
-    await fbAuth.createUserWithEmailAndPassword(email,pass);
+    const cred=await fbAuth.createUserWithEmailAndPassword(email,pass);
+    if(name && cred && cred.user){
+      await cred.user.updateProfile({displayName:name});
+      updateHeaderUserBadge(currentUser); // o badge já pode ter sido renderizado antes do nome ser gravado
+    }
   }catch(e){
     if(errEl) errEl.textContent=authErrMsg(e);
   }
@@ -1295,21 +1304,64 @@ function hideLoginScreen(){
   const el=document.getElementById('auth-overlay');
   if(el) el.style.display='none';
 }
+function updateHeaderUserBadge(user){
+  const badge=document.getElementById('hdr-user-badge');
+  if(!badge) return;
+  if(user){
+    const label=user.displayName || user.email || 'conectado';
+    badge.textContent='👤 '+label;
+    badge.title='Conectado como '+(user.displayName?(user.displayName+' — '+user.email):user.email)+' · clique para editar';
+  } else {
+    badge.textContent='👤';
+    badge.title='Conta conectada';
+  }
+}
 function authGate(){
   fbAuth.onAuthStateChanged(async (user)=>{
     if(user){
       currentUser = user;
       hideLoginScreen();
-      const badge=document.getElementById('hdr-user-badge');
-      if(badge){ badge.textContent='👤 '+(user.email||'conectado'); badge.title='Conectado como '+(user.email||''); }
+      updateHeaderUserBadge(user);
       await init();
     } else {
       currentUser = null;
-      const badge=document.getElementById('hdr-user-badge');
-      if(badge){ badge.textContent='👤'; badge.title='Conta conectada'; }
+      updateHeaderUserBadge(null);
       showLoginScreen();
     }
   });
+}
+
+// ── PERFIL DO USUÁRIO ────────────────────────────────────────────
+function openProfileModal(){
+  if(!currentUser) return;
+  const nameEl=document.getElementById('profile-name-input');
+  const emailEl=document.getElementById('profile-email-display');
+  const errEl=document.getElementById('profile-err');
+  if(nameEl) nameEl.value=currentUser.displayName||'';
+  if(emailEl) emailEl.textContent=currentUser.email||'';
+  if(errEl) errEl.textContent='';
+  document.getElementById('profile-modal-overlay').classList.add('open');
+}
+function closeProfileModal(){
+  document.getElementById('profile-modal-overlay').classList.remove('open');
+}
+async function saveProfileName(){
+  if(!currentUser) return;
+  const nameEl=document.getElementById('profile-name-input');
+  const errEl=document.getElementById('profile-err');
+  const btn=document.getElementById('profile-save-btn');
+  const name=(nameEl?.value||'').trim();
+  if(errEl) errEl.textContent='';
+  if(btn){ btn.disabled=true; btn.textContent='Salvando…'; }
+  try{
+    await currentUser.updateProfile({displayName:name||null});
+    updateHeaderUserBadge(currentUser);
+    closeProfileModal();
+  }catch(e){
+    if(errEl) errEl.textContent='Não foi possível salvar. Tente novamente.';
+    console.error('[perfil] erro ao salvar nome:', e);
+  }
+  if(btn){ btn.disabled=false; btn.textContent='✅ Salvar'; }
 }
 
 // ── CURSOS ──────────────────────────────────────────────────────
@@ -6036,6 +6088,27 @@ authGate();
     <div class="goal-footer">
       <button class="goal-btn goal-btn-cancel" onclick="closeGoalModal()">Cancelar</button>
       <button class="goal-btn goal-btn-save" onclick="saveGoals()">✅ Salvar metas</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PERFIL DO USUÁRIO ═══ -->
+<div id="profile-modal-overlay" class="goal-modal-overlay" onclick="if(event.target===this)closeProfileModal()">
+  <div class="goal-modal">
+    <h3>👤 Seu Perfil</h3>
+    <div class="goal-row">
+      <label>Nome</label>
+      <input type="text" id="profile-name-input" placeholder="Como podemos te chamar?" maxlength="60">
+      <div class="goal-hint">Esse nome aparece no cabeçalho do app em vez do seu e-mail.</div>
+    </div>
+    <div class="goal-row">
+      <label>E-mail</label>
+      <div id="profile-email-display" style="font-size:13px;color:#888;padding:6px 0;font-weight:600"></div>
+    </div>
+    <div id="profile-err" style="min-height:16px;font-size:12px;color:#D9534F;font-weight:600;margin:-4px 0 4px"></div>
+    <div class="goal-footer">
+      <button class="goal-btn goal-btn-cancel" onclick="closeProfileModal()">Cancelar</button>
+      <button class="goal-btn goal-btn-save" id="profile-save-btn" onclick="saveProfileName()">✅ Salvar</button>
     </div>
   </div>
 </div>

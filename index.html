@@ -613,7 +613,8 @@ body.focus-mode #focus-mode-btn{
   width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;
   background:linear-gradient(135deg,#ef4444,#dc2626);
   color:#fff;font-size:22px;box-shadow:0 4px 18px rgba(239,68,68,.45);
-  transition:all .2s;display:flex;align-items:center;justify-content:center;
+  transition:box-shadow .2s;display:flex;align-items:center;justify-content:center;
+  touch-action:none;will-change:transform;
 }
 #pomo-fab:hover{transform:scale(1.1);box-shadow:0 6px 24px rgba(239,68,68,.6)}
 #pomo-fab.running{background:linear-gradient(135deg,#f97316,#ef4444);animation:pomopulse 2s ease-in-out infinite}
@@ -4524,9 +4525,11 @@ function pomoInitFabDrag(){
   const fab = document.getElementById('pomo-fab');
   if(!fab || _pomoFabDragInited) return;
   _pomoFabDragInited = true;
+  fab.style.touchAction = 'none'; // evita o navegador "disputar" o gesto com scroll no mobile (causa de lentidão)
 
   let dragging=false, moved=false, pointerId=null;
-  let startX=0, startY=0, origLeft=0, origTop=0;
+  let startX=0, startY=0, origLeft=0, origTop=0, fabW=0, fabH=0;
+  let pendingDx=0, pendingDy=0, rafId=null;
 
   // Restaurar posição salva (se o usuário já arrastou antes)
   if(state.pomoFabPos && state.pomoFabPos.left && state.pomoFabPos.top){
@@ -4544,7 +4547,7 @@ function pomoInitFabDrag(){
   }
 
   fab.addEventListener('pointerdown', function(e){
-    fab.setPointerCapture(e.pointerId);
+    try{ fab.setPointerCapture(e.pointerId); }catch(err){}
     pointerId=e.pointerId;
     const rect=fab.getBoundingClientRect();
     fab.style.position='fixed';
@@ -4552,8 +4555,11 @@ function pomoInitFabDrag(){
     fab.style.top=rect.top+'px';
     fab.style.right='auto';
     fab.style.bottom='auto';
+    fab.style.transform='';
     origLeft=rect.left; origTop=rect.top;
+    fabW=fab.offsetWidth; fabH=fab.offsetHeight; // ler 1x só (evita reflow repetido a cada movimento)
     startX=e.clientX; startY=e.clientY;
+    pendingDx=0; pendingDy=0;
     dragging=true; moved=false;
   });
   fab.addEventListener('pointermove', function(e){
@@ -4562,15 +4568,25 @@ function pomoInitFabDrag(){
     if(!moved && (Math.abs(dx)>4 || Math.abs(dy)>4)) moved=true;
     if(!moved) return;
     e.preventDefault();
-    const newL=Math.max(8, Math.min(origLeft+dx, window.innerWidth - fab.offsetWidth - 8));
-    const newT=Math.max(8, Math.min(origTop +dy, window.innerHeight - fab.offsetHeight - 8));
-    fab.style.left=newL+'px';
-    fab.style.top=newT+'px';
-  });
+    pendingDx=Math.max(8-origLeft, Math.min(dx, window.innerWidth  - fabW - 8 - origLeft));
+    pendingDy=Math.max(8-origTop,  Math.min(dy, window.innerHeight - fabH - 8 - origTop));
+    // Move visualmente via transform (GPU, sem reflow) e só grava o resultado 1x por frame
+    if(rafId==null){
+      rafId=requestAnimationFrame(()=>{
+        rafId=null;
+        fab.style.transform=`translate(${pendingDx}px, ${pendingDy}px)`;
+      });
+    }
+  }, {passive:false});
   function endDrag(e){
     if(!dragging) return;
     dragging=false; pointerId=null;
+    if(rafId!=null){ cancelAnimationFrame(rafId); rafId=null; }
     if(moved){
+      // Consolida o transform em left/top definitivos
+      fab.style.transform='';
+      fab.style.left=(origLeft+pendingDx)+'px';
+      fab.style.top =(origTop +pendingDy)+'px';
       state.pomoFabPos={left:fab.style.left, top:fab.style.top};
       save();
     } else {
@@ -4579,7 +4595,11 @@ function pomoInitFabDrag(){
     }
   }
   fab.addEventListener('pointerup', endDrag);
-  fab.addEventListener('pointercancel', function(){ dragging=false; pointerId=null; });
+  fab.addEventListener('pointercancel', function(){
+    dragging=false; pointerId=null;
+    if(rafId!=null){ cancelAnimationFrame(rafId); rafId=null; }
+    fab.style.transform='';
+  });
 }
 
 function togglePomoWidget(){

@@ -283,6 +283,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .cm-sec-lessons{padding:10px 13px;display:none}
 .cm-sec-lessons.open{display:block}
 .cm-lesson-row{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.cm-reorder-col{display:flex;flex-direction:column;flex-shrink:0}
+.cm-reorder-col button{font-size:8px;line-height:1;padding:2px 4px;border:none;background:none;cursor:pointer;color:#aaa}
+.cm-reorder-col button:hover:not(:disabled){color:#185FA5}
+.cm-reorder-col button:disabled{opacity:.2;cursor:default}
+.cm-insert-btn{background:none;border:none;cursor:pointer;color:#1D9E75;font-size:15px;padding:0 3px;flex-shrink:0}
+.cm-insert-btn:hover{color:#157a5c}
 .cm-lesson-row input{flex:1;font-size:12px;padding:7px 10px;border:1px solid #e8e6e0;border-radius:7px;background:#faf9f7;color:#1a1a18;font-family:inherit;outline:none}
 .cm-lesson-row input:focus{border-color:#185FA5}
 .cm-lesson-dur{width:56px;font-size:12px;padding:7px 8px;border:1px solid #e8e6e0;border-radius:7px;background:#faf9f7;color:#1a1a18;font-family:inherit;outline:none;text-align:center}
@@ -5374,8 +5380,13 @@ function renderCmSectionsEditor(){
   const el=document.getElementById('cm-sections-editor'); if(!el) return;
   el.innerHTML=_cmSections.map((sec,si)=>{
     const isOpen=_cmOpenSecs[sec.id]!==false;
+    const isFirstSec=si===0, isLastSec=si===_cmSections.length-1;
     return `<div class="cm-sec-block">
       <div class="cm-sec-hdr" onclick="cmToggleSecEditor('${sec.id}')">
+        <div class="cm-reorder-col" onclick="event.stopPropagation()">
+          <button onclick="cmMoveSecUp(${si})" ${isFirstSec?'disabled':''} title="Mover seção para cima">▲</button>
+          <button onclick="cmMoveSecDown(${si})" ${isLastSec?'disabled':''} title="Mover seção para baixo">▼</button>
+        </div>
         <div class="cm-sec-hdr-num">${sec.num}</div>
         <input class="cm-input" value="${escHtml(sec.title)}" placeholder="Nome da seção..." 
           style="flex:1;padding:5px 9px;font-size:12px;font-weight:600;border:none;background:transparent;outline:none"
@@ -5384,19 +5395,27 @@ function renderCmSectionsEditor(){
           style="width:28px;height:28px;border:none;border-radius:6px;cursor:pointer;padding:2px;background:none"
           oninput="_cmSections[${si}].color=this.value" onclick="event.stopPropagation()"/>
         <span class="cm-sec-hdr-count">${sec.lessons.length} aulas</span>
+        <button class="cm-insert-btn" onclick="event.stopPropagation();cmInsertSecAfter(${si})" title="Inserir nova seção logo depois desta">➕</button>
         <button onclick="event.stopPropagation();cmRemoveSec(${si})" style="background:none;border:none;cursor:pointer;color:#bbb;font-size:14px;padding:0 4px" title="Remover seção">✕</button>
         <span style="color:#bbb;font-size:12px">${isOpen?'▲':'▼'}</span>
       </div>
       <div class="cm-sec-lessons ${isOpen?'open':''}">
-        ${sec.lessons.map((l,li)=>`
+        ${sec.lessons.map((l,li)=>{
+          const isFirstL=li===0, isLastL=li===sec.lessons.length-1;
+          return `
         <div class="cm-lesson-row">
           <span style="font-size:10px;color:#bbb;min-width:20px;text-align:right">${l.n}</span>
+          <div class="cm-reorder-col">
+            <button onclick="cmMoveLessonUp(${si},${li})" ${isFirstL?'disabled':''} title="Mover aula para cima">▲</button>
+            <button onclick="cmMoveLessonDown(${si},${li})" ${isLastL?'disabled':''} title="Mover aula para baixo">▼</button>
+          </div>
           <input value="${escHtml(l.t)}" placeholder="Nome da aula..." class="cm-lesson-inp-${si}-${li}"
             oninput="_cmSections[${si}].lessons[${li}].t=this.value"/>
           <input value="${escHtml(l.d)}" placeholder="5m" class="cm-lesson-dur"
             oninput="_cmSections[${si}].lessons[${li}].d=this.value"/>
+          <button class="cm-insert-btn" onclick="cmInsertLessonAfter(${si},${li})" title="Inserir nova aula logo depois desta">➕</button>
           <button onclick="cmRemoveLesson(${si},${li})" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:14px;padding:0 3px" title="Remover aula">✕</button>
-        </div>`).join('')}
+        </div>`;}).join('')}
         <button onclick="cmAddLesson(${si})" style="font-size:11px;padding:6px 12px;border:1px dashed #e8e6e0;border-radius:7px;background:none;cursor:pointer;color:#888;margin-top:4px;width:100%">+ Adicionar aula</button>
       </div>
     </div>`;
@@ -5419,6 +5438,28 @@ function cmAddSection(){
   if(el) setTimeout(()=>el.scrollIntoView({block:'end',behavior:'smooth'}),50);
 }
 
+// Insere uma nova seção em branco logo após a seção de índice `si` (não precisa ser no fim)
+function cmInsertSecAfter(si){
+  const id='s'+Date.now();
+  _cmSections.splice(si+1,0,{id,num:0,title:'',color:'#185FA5',lessons:[{n:1,t:'',d:''}]});
+  _cmSections.forEach((s,i)=>{s.num=i+1;});
+  _cmOpenSecs[id]=true;
+  renderCmSectionsEditor();
+}
+
+function cmMoveSecUp(si){
+  if(si<=0) return;
+  [_cmSections[si-1],_cmSections[si]]=[_cmSections[si],_cmSections[si-1]];
+  _cmSections.forEach((s,i)=>{s.num=i+1;});
+  renderCmSectionsEditor();
+}
+function cmMoveSecDown(si){
+  if(si>=_cmSections.length-1) return;
+  [_cmSections[si],_cmSections[si+1]]=[_cmSections[si+1],_cmSections[si]];
+  _cmSections.forEach((s,i)=>{s.num=i+1;});
+  renderCmSectionsEditor();
+}
+
 function cmRemoveSec(si){
   if(_cmSections.length===1){ alert('O curso precisa de ao menos uma seção.'); return; }
   _cmSections.splice(si,1);
@@ -5430,6 +5471,33 @@ function cmAddLesson(si){
   const sec=_cmSections[si];
   const nextN=(sec.lessons[sec.lessons.length-1]?.n||0)+1;
   sec.lessons.push({n:nextN,t:'',d:''});
+  renderCmSectionsEditor();
+}
+
+// Insere uma nova aula em branco logo após a aula de índice `li` dentro da seção `si`
+function cmInsertLessonAfter(si,li){
+  const sec=_cmSections[si];
+  sec.lessons.splice(li+1,0,{n:0,t:'',d:''});
+  sec.lessons.forEach((l,i)=>{l.n=i+1;});
+  renderCmSectionsEditor();
+  setTimeout(()=>{
+    const inp=document.querySelector('.cm-lesson-inp-'+si+'-'+(li+1));
+    if(inp) inp.focus();
+  },50);
+}
+
+function cmMoveLessonUp(si,li){
+  const sec=_cmSections[si];
+  if(li<=0) return;
+  [sec.lessons[li-1],sec.lessons[li]]=[sec.lessons[li],sec.lessons[li-1]];
+  sec.lessons.forEach((l,i)=>{l.n=i+1;});
+  renderCmSectionsEditor();
+}
+function cmMoveLessonDown(si,li){
+  const sec=_cmSections[si];
+  if(li>=sec.lessons.length-1) return;
+  [sec.lessons[li],sec.lessons[li+1]]=[sec.lessons[li+1],sec.lessons[li]];
+  sec.lessons.forEach((l,i)=>{l.n=i+1;});
   renderCmSectionsEditor();
 }
 

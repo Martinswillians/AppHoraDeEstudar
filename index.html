@@ -759,6 +759,9 @@ body.focus-mode #focus-mode-btn{
     <div id="auth-err" style="min-height:18px;font-size:12px;font-weight:600;color:#ff6b6b;margin-bottom:8px"></div>
     <button id="auth-btn-login" onclick="authLogin()" style="width:100%;padding:12px;border:none;border-radius:10px;background:#185FA5;color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px">Entrar</button>
     <button id="auth-btn-signup" onclick="authSignup()" style="width:100%;padding:12px;border:1.5px solid #444;border-radius:10px;background:transparent;color:#ddd;font-size:14px;font-weight:700;cursor:pointer">Criar conta</button>
+    <div style="text-align:center;margin-top:12px">
+      <button type="button" onclick="authForgotPassword()" style="background:none;border:none;color:#7ca9d8;font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline">Esqueci minha senha</button>
+    </div>
     <div id="auth-loading" style="display:none;text-align:center;font-size:12px;color:#999;margin-top:10px">Conectando…</div>
   </div>
 </div>
@@ -1298,6 +1301,26 @@ async function authSignup(){
   }
   authSetLoading(false);
 }
+// Envia um e-mail de recuperação de senha (fluxo padrão do Firebase Auth)
+async function authForgotPassword(){
+  const email=document.getElementById('auth-email').value.trim();
+  const errEl=document.getElementById('auth-err');
+  if(errEl){ errEl.style.color='#ff6b6b'; errEl.textContent=''; }
+  if(!email){
+    if(errEl) errEl.textContent='Digite seu e-mail no campo acima e clique em "Esqueci minha senha" de novo.';
+    document.getElementById('auth-email')?.focus();
+    return;
+  }
+  authSetLoading(true);
+  try{
+    await fbAuth.sendPasswordResetEmail(email);
+    if(errEl){ errEl.style.color='#4ade80'; errEl.textContent='E-mail de recuperação enviado! Confira sua caixa de entrada (e o spam).'; }
+  }catch(e){
+    if(errEl){ errEl.style.color='#ff6b6b'; errEl.textContent=authErrMsg(e); }
+  }
+  authSetLoading(false);
+}
+
 function authLogout(){
   if(!confirm('Sair da conta? Seus dados continuam salvos na nuvem.')) return;
   fbAuth.signOut();
@@ -1346,10 +1369,59 @@ function openProfileModal(){
   if(nameEl) nameEl.value=currentUser.displayName||'';
   if(emailEl) emailEl.textContent=currentUser.email||'';
   if(errEl) errEl.textContent='';
+  resetProfilePasswordSection();
   document.getElementById('profile-modal-overlay').classList.add('open');
 }
 function closeProfileModal(){
   document.getElementById('profile-modal-overlay').classList.remove('open');
+  resetProfilePasswordSection();
+}
+function resetProfilePasswordSection(){
+  const section=document.getElementById('profile-pw-section');
+  const chevron=document.getElementById('profile-pw-chevron');
+  if(section) section.style.display='none';
+  if(chevron) chevron.textContent='▸';
+  ['profile-pw-current','profile-pw-new','profile-pw-confirm'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  const errEl=document.getElementById('profile-pw-err'); if(errEl) errEl.textContent='';
+}
+function toggleProfilePasswordSection(){
+  const section=document.getElementById('profile-pw-section');
+  const chevron=document.getElementById('profile-pw-chevron');
+  if(!section) return;
+  const open=section.style.display!=='none';
+  section.style.display=open?'none':'block';
+  if(chevron) chevron.textContent=open?'▸':'▾';
+}
+async function changeUserPassword(){
+  if(!currentUser) return;
+  const curEl=document.getElementById('profile-pw-current');
+  const newEl=document.getElementById('profile-pw-new');
+  const confEl=document.getElementById('profile-pw-confirm');
+  const errEl=document.getElementById('profile-pw-err');
+  const btn=document.getElementById('profile-pw-btn');
+  const cur=curEl?.value||'', novaSenha=newEl?.value||'', conf=confEl?.value||'';
+  if(errEl) errEl.textContent='';
+  if(!cur){ if(errEl) errEl.textContent='Informe sua senha atual.'; return; }
+  if(novaSenha.length<6){ if(errEl) errEl.textContent='A nova senha deve ter pelo menos 6 caracteres.'; return; }
+  if(novaSenha!==conf){ if(errEl) errEl.textContent='A confirmação não bate com a nova senha.'; return; }
+  if(btn){ btn.disabled=true; btn.textContent='Alterando…'; }
+  try{
+    // Reautentica com a senha atual (o Firebase exige login recente para trocar a senha)
+    const cred=firebase.auth.EmailAuthProvider.credential(currentUser.email, cur);
+    await currentUser.reauthenticateWithCredential(cred);
+    await currentUser.updatePassword(novaSenha);
+    if(errEl){ errEl.style.color='#1D9E75'; errEl.textContent='Senha alterada com sucesso!'; }
+    ['profile-pw-current','profile-pw-new','profile-pw-confirm'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.value='';
+    });
+    setTimeout(()=>{ if(errEl){ errEl.style.color='#D9534F'; errEl.textContent=''; } toggleProfilePasswordSection(); }, 1800);
+  }catch(e){
+    if(errEl){ errEl.style.color='#D9534F'; errEl.textContent=e.code==='auth/wrong-password'||e.code==='auth/invalid-credential' ? 'Senha atual incorreta.' : authErrMsg(e); }
+    console.error('[perfil] erro ao trocar senha:', e);
+  }
+  if(btn){ btn.disabled=false; btn.textContent='🔒 Alterar senha'; }
 }
 async function saveProfileName(){
   if(!currentUser) return;
@@ -6188,6 +6260,28 @@ authGate();
     <div class="goal-footer">
       <button class="goal-btn goal-btn-cancel" onclick="closeProfileModal()">Cancelar</button>
       <button class="goal-btn goal-btn-save" id="profile-save-btn" onclick="saveProfileName()">✅ Salvar</button>
+    </div>
+
+    <div style="border-top:1px solid #eee;margin-top:18px;padding-top:14px">
+      <button type="button" onclick="toggleProfilePasswordSection()" style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#444">
+        <span id="profile-pw-chevron">▸</span> Alterar senha
+      </button>
+      <div id="profile-pw-section" style="display:none;margin-top:12px">
+        <div class="goal-row">
+          <label>Senha atual</label>
+          <input type="password" id="profile-pw-current" placeholder="Sua senha atual" autocomplete="current-password">
+        </div>
+        <div class="goal-row">
+          <label>Nova senha</label>
+          <input type="password" id="profile-pw-new" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+        </div>
+        <div class="goal-row">
+          <label>Confirmar nova senha</label>
+          <input type="password" id="profile-pw-confirm" placeholder="Repita a nova senha" autocomplete="new-password">
+        </div>
+        <div id="profile-pw-err" style="min-height:16px;font-size:12px;color:#D9534F;font-weight:600;margin:-4px 0 8px"></div>
+        <button class="goal-btn goal-btn-save" id="profile-pw-btn" style="width:100%" onclick="changeUserPassword()">🔒 Alterar senha</button>
+      </div>
     </div>
   </div>
 </div>

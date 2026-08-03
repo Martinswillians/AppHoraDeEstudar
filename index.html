@@ -215,7 +215,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .log-body{flex:1;min-width:0}
 .log-title-txt{font-size:13px;font-weight:600;color:#1a1a18}
 .log-desc-txt{font-size:12px;color:#888;margin-top:2px;line-height:1.5}
-.log-h{font-size:14px;font-weight:700;color:#185FA5}
+.log-h{font-size:20px;font-weight:800;color:#185FA5}
+.log-list-label{font-size:12px;font-weight:800;color:#666;text-transform:uppercase;letter-spacing:.4px;margin:20px 2px 10px;display:flex;align-items:center;gap:6px}
 .log-hl{font-size:9px;color:#aaa}
 /* ── OVERVIEW ── */
 .ov-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
@@ -1120,6 +1121,7 @@ body.focus-mode #focus-mode-btn{
         </div>
         <button class="btn-log" onclick="addLog()">Registrar ↗</button>
       </div>
+      <div class="log-list-label">🗂 Lista de Registros de Estudo</div>
       <div id="d-log-list"></div>
     </div>
     <div id="ctab-cursos" class="ctab"><div id="d-cursos-panel" style="max-width:760px;margin:0 auto;padding-bottom:32px"></div></div>
@@ -1197,6 +1199,7 @@ body.focus-mode #focus-mode-btn{
       <div class="form-field" style="margin-bottom:10px"><label>Anotação</label><textarea id="m-log-desc" style="min-height:65px;resize:none;line-height:1.5" placeholder="O que você estudou?"></textarea></div>
       <button class="btn-log" style="width:100%;padding:11px" onclick="mAddLog()">Registrar ↗</button>
     </div>
+    <div class="log-list-label" style="margin:0 0 8px">🗂 Lista de Registros de Estudo</div>
     <div id="m-log-list"></div>
   </div>
   <div id="ms-cursos" class="m-screen" style="height:100%;overflow-y:auto;padding:12px;display:none">
@@ -1796,7 +1799,7 @@ let state = {
 let activeKey = null;
 let curNoteType = 'tip';
 let curLang = 'java';
-let curLessonTab = 'notas'; // 'notas' | 'codigo'
+let curLessonTab = 'notas'; // 'notas' | 'codigo' | 'exercicios'
 let expCtx = {tab:'aula', secId:null, lessonN:null, expSecId:null};
 let globalCodeFilter = 'all';
 
@@ -2006,13 +2009,13 @@ async function load(){
     if(d){
       const p=JSON.parse(d);
       if(p && typeof p === 'object'){
-        state=Object.assign({done:{},notes:{},codes:{},logs:[],customTitles:{},activeCourseId:state.activeCourseId||'java-completo'},p);
+        state=Object.assign({done:{},notes:{},codes:{},exercises:{},logs:[],customTitles:{},activeCourseId:state.activeCourseId||'java-completo'},p);
         return;
       }
     }
   }catch(e){}
   // Nenhum dado na nuvem ainda para este curso: começa vazio
-  state=Object.assign({done:{},notes:{},codes:{},logs:[],customTitles:{}}, {activeCourseId: state.activeCourseId||'java-completo'});
+  state=Object.assign({done:{},notes:{},codes:{},exercises:{},logs:[],customTitles:{}}, {activeCourseId: state.activeCourseId||'java-completo'});
 }
 
 // -- STATS ---------------------------------------------------
@@ -2362,6 +2365,7 @@ function dRenderLesson(secId,n){
   const title=state.customTitles[k]||lesson.t;
   const notes=state.notes[k]||[];
   const codes=state.codes[k]||[];
+  const exercises=(state.exercises&&state.exercises[k])||[];
   const area=document.getElementById('d-lesson-area');
   area.innerHTML=`
     <div class="lesson-detail">
@@ -2382,6 +2386,7 @@ function dRenderLesson(secId,n){
       <div class="sub-tabs">
         <button class="sub-tab-btn ${curLessonTab==='notas'?'active':''}" onclick="setLessonTab('notas','${secId}',${n})">📝 Anotações (${notes.length})</button>
         <button class="sub-tab-btn ${curLessonTab==='codigo'?'active':''}" onclick="setLessonTab('codigo','${secId}',${n})">💻 Código (${codes.length})</button>
+        <button class="sub-tab-btn ${curLessonTab==='exercicios'?'active':''}" onclick="setLessonTab('exercicios','${secId}',${n})">📚 Exercícios (${exercises.length})</button>
       </div>
       <div id="lpanel-notas" style="display:${curLessonTab==='notas'?'block':'none'}">
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px" id="d-nt-btns">
@@ -2417,6 +2422,14 @@ function dRenderLesson(secId,n){
         </div>
         <div id="d-codes-${k}">${renderCodesHTML(k,secId,n)}</div>
       </div>
+      <div id="lpanel-exercicios" style="display:${curLessonTab==='exercicios'?'block':'none'}">
+        <div class="note-inp-area">
+          <textarea id="d-ex-question" placeholder="Enunciado do exercício..." style="min-height:60px"></textarea>
+          <textarea id="d-ex-answer" placeholder="Resposta / resolução (opcional, fica escondida até você clicar em 'Ver resposta')..." style="min-height:60px"></textarea>
+          <button class="btn-add-note" onclick="addExercise('${k}','${secId}',${n})">+ Adicionar exercício</button>
+        </div>
+        <div id="d-exercises-${k}">${renderExercisesHTML(k,secId,n)}</div>
+      </div>
     </div>`;
 }
 
@@ -2424,9 +2437,11 @@ function setLessonTab(tab,secId,n){
   curLessonTab=tab;
   const pn=document.getElementById('lpanel-notas');
   const pc=document.getElementById('lpanel-codigo');
+  const pe=document.getElementById('lpanel-exercicios');
   if(pn) pn.style.display=tab==='notas'?'block':'none';
   if(pc) pc.style.display=tab==='codigo'?'block':'none';
-  document.querySelectorAll('.sub-tab-btn').forEach((b,i)=>b.classList.toggle('active',['notas','codigo'][i]===tab));
+  if(pe) pe.style.display=tab==='exercicios'?'block':'none';
+  document.querySelectorAll('.sub-tab-btn').forEach((b,i)=>b.classList.toggle('active',['notas','codigo','exercicios'][i]===tab));
 }
 function setNoteType(btn){ curNoteType=btn.dataset.type; document.querySelectorAll('#d-nt-btns .ntb').forEach(b=>{b.className='ntb';if(b.dataset.type===curNoteType)b.classList.add('sel-'+curNoteType);}); }
 function setLang(btn){ curLang=btn.dataset.lang; document.querySelectorAll('#d-lang-btns .lang-btn').forEach(b=>{b.className='lang-btn';if(b.dataset.lang===curLang)b.classList.add('sel');}); }
@@ -2659,6 +2674,63 @@ function deleteCode(k,id,secId,n){
   if(!state.codes[k]) return; state.codes[k]=state.codes[k].filter(c=>c.id!==id); save(); updateStats();
   dRenderLesson(secId,n); setLessonTab('codigo',secId,n); dRenderGlobalCode(); mRenderCode();
 }
+// -- EXERCÍCIOS -------------------------------------------------
+function addExercise(k,secId,n){
+  const qi=document.getElementById('d-ex-question'); const ai=document.getElementById('d-ex-answer');
+  const question=qi?.value.trim(); const answer=ai?.value.trim();
+  if(!question) return;
+  if(!state.exercises) state.exercises={};
+  if(!state.exercises[k]) state.exercises[k]=[];
+  state.exercises[k].push({id:Date.now(), question, answer, status:null, date:new Date().toLocaleDateString('pt-BR')});
+  if(qi) qi.value=''; if(ai) ai.value='';
+  save(); updateStats(); dRenderLesson(secId,n); setLessonTab('exercicios',secId,n);
+}
+function mAddExercise(k,secId,n){
+  const qi=document.getElementById('m-ex-question'); const ai=document.getElementById('m-ex-answer');
+  const question=qi?.value.trim(); const answer=ai?.value.trim();
+  if(!question) return;
+  if(!state.exercises) state.exercises={};
+  if(!state.exercises[k]) state.exercises[k]=[];
+  state.exercises[k].push({id:Date.now(), question, answer, status:null, date:new Date().toLocaleDateString('pt-BR')});
+  if(qi) qi.value=''; if(ai) ai.value='';
+  save(); updateStats(); mRenderLesson(secId,n); mSetLessonTab('exercicios',secId,n);
+}
+function renderExercisesHTML(k,secId,n){
+  const list=(state.exercises&&state.exercises[k])||[];
+  if(!list.length) return `<div class="empty" style="padding:16px">Nenhum exercício ainda. Adicione acima!</div>`;
+  return list.map(ex=>{
+    const statusBadge = ex.status==='correct'
+      ? '<span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:10px;background:#1D9E7522;color:#1D9E75">✓ Acertei</span>'
+      : ex.status==='wrong'
+        ? '<span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:10px;background:#ef444422;color:#ef4444">✗ Errei</span>'
+        : '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:#f0eeea;color:#999">Não respondido</span>';
+    return `<div class="code-block" id="ex-${ex.id}" style="padding:13px 15px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:700;color:#1a1a18;white-space:pre-wrap;flex:1;line-height:1.5">${escHtml(ex.question)}</div>
+        <button class="code-icon-btn" onclick="deleteExercise('${k}',${ex.id},'${secId}',${n})" style="color:#f87171">✕</button>
+      </div>
+      ${ex.answer ? `<details style="margin-bottom:9px"><summary style="cursor:pointer;font-size:12px;color:#185FA5;font-weight:700">Ver resposta</summary><div style="font-size:12px;color:#444;white-space:pre-wrap;margin-top:6px;line-height:1.6;padding:8px 10px;background:#f7f6f3;border-radius:7px">${escHtml(ex.answer)}</div></details>` : ''}
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        ${statusBadge}
+        <button onclick="markExercise('${k}',${ex.id},'correct','${secId}',${n})" style="font-size:11px;padding:5px 11px;border-radius:8px;border:1.5px solid #1D9E75;background:${ex.status==='correct'?'#1D9E75':'transparent'};color:${ex.status==='correct'?'#fff':'#1D9E75'};cursor:pointer;font-weight:700">✓ Acertei</button>
+        <button onclick="markExercise('${k}',${ex.id},'wrong','${secId}',${n})" style="font-size:11px;padding:5px 11px;border-radius:8px;border:1.5px solid #ef4444;background:${ex.status==='wrong'?'#ef4444':'transparent'};color:${ex.status==='wrong'?'#fff':'#ef4444'};cursor:pointer;font-weight:700">✗ Errei</button>
+        <span style="font-size:10px;color:#aaa;margin-left:auto">${ex.date}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+function deleteExercise(k,id,secId,n){
+  if(!state.exercises || !state.exercises[k]) return;
+  state.exercises[k]=state.exercises[k].filter(e=>e.id!==id);
+  save(); updateStats(); dRenderLesson(secId,n); setLessonTab('exercicios',secId,n); mRenderLesson(secId,n); mSetLessonTab('exercicios',secId,n);
+}
+function markExercise(k,id,status,secId,n){
+  if(!state.exercises || !state.exercises[k]) return;
+  const ex=state.exercises[k].find(e=>e.id===id); if(!ex) return;
+  ex.status = ex.status===status ? null : status; // clicar de novo no mesmo status desmarca
+  save(); updateStats(); dRenderLesson(secId,n); setLessonTab('exercicios',secId,n); mRenderLesson(secId,n); mSetLessonTab('exercicios',secId,n);
+}
+
 function editCode(k,id,secId,n){
   const c=(state.codes[k]||[]).find(x=>x.id===id); if(!c) return;
   const block=document.getElementById('cb-'+id); if(!block) return;
@@ -3533,6 +3605,7 @@ function mRenderLesson(secId,n){
   const title=state.customTitles[k]||lesson.t;
   document.getElementById('m-aula-ttl').textContent=title;
   const notes=state.notes[k]||[]; const codes=state.codes[k]||[];
+  const exercises=(state.exercises&&state.exercises[k])||[];
   const mlt=window._mLessonTab||'notas';
   const body=document.getElementById('m-aula-body');
   body.innerHTML=`
@@ -3557,6 +3630,7 @@ function mRenderLesson(secId,n){
       <div style="display:flex;gap:0;border-bottom:1px solid #e8e6e0;margin-bottom:12px">
         <button style="flex:1;padding:9px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid ${mlt==='notas'?'#185FA5':'transparent'};color:${mlt==='notas'?'#1a1a18':'#888'}" onclick="mSetLessonTab('notas','${secId}',${n})">📝 Notas (${notes.length})</button>
         <button style="flex:1;padding:9px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid ${mlt==='codigo'?'#534AB7':'transparent'};color:${mlt==='codigo'?'#1a1a18':'#888'}" onclick="mSetLessonTab('codigo','${secId}',${n})">💻 Código (${codes.length})</button>
+        <button style="flex:1;padding:9px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid ${mlt==='exercicios'?'#f97316':'transparent'};color:${mlt==='exercicios'?'#1a1a18':'#888'}" onclick="mSetLessonTab('exercicios','${secId}',${n})">📚 Exerc. (${exercises.length})</button>
       </div>
       <!-- NOTAS panel -->
       <div id="m-panel-notas" style="display:${mlt==='notas'?'block':'none'}">
@@ -3583,12 +3657,20 @@ function mRenderLesson(secId,n){
         <button onclick="mAddCode('${k}','${secId}',${n})" style="display:block;width:100%;padding:13px;border:none;border-radius:10px;background:#534AB7;color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:13px">+ Salvar código</button>
         <div id="m-codes-${k}">${renderCodesHTML(k,secId,n)}</div>
       </div>
+      <!-- EXERCÍCIOS panel -->
+      <div id="m-panel-exercicios" style="display:${mlt==='exercicios'?'block':'none'}">
+        <textarea id="m-ex-question" placeholder="Enunciado do exercício..." style="display:block;width:100%;font-size:14px;padding:11px 12px;border:1px solid #e8e6e0;border-radius:10px;background:#faf9f7;color:#1a1a18;font-family:inherit;outline:none;resize:none;height:70px;line-height:1.6;margin-bottom:8px"></textarea>
+        <textarea id="m-ex-answer" placeholder="Resposta / resolução (opcional)..." style="display:block;width:100%;font-size:14px;padding:11px 12px;border:1px solid #e8e6e0;border-radius:10px;background:#faf9f7;color:#1a1a18;font-family:inherit;outline:none;resize:none;height:70px;line-height:1.6;margin-bottom:8px"></textarea>
+        <button onclick="mAddExercise('${k}','${secId}',${n})" style="display:block;width:100%;padding:13px;border:none;border-radius:10px;background:#f97316;color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:13px">+ Adicionar exercício</button>
+        <div id="m-exercises-${k}">${renderExercisesHTML(k,secId,n)}</div>
+      </div>
     </div>`;
 }
 function mSetLessonTab(tab,secId,n){
   window._mLessonTab=tab;
   document.getElementById('m-panel-notas').style.display=tab==='notas'?'block':'none';
   document.getElementById('m-panel-codigo').style.display=tab==='codigo'?'block':'none';
+  const pe=document.getElementById('m-panel-exercicios'); if(pe) pe.style.display=tab==='exercicios'?'block':'none';
 }
 function mSetNoteType(btn){ curNoteType=btn.dataset.type; document.querySelectorAll('#m-nt-btns .ntb').forEach(b=>{b.className='ntb';if(b.dataset.type===curNoteType)b.classList.add('sel-'+curNoteType);}); }
 function mSetLang(btn){ curLang=btn.dataset.lang; document.querySelectorAll('#m-lang-btns .lang-btn').forEach(b=>{b.className='lang-btn';if(b.dataset.lang===curLang)b.classList.add('sel');}); }
@@ -4514,9 +4596,9 @@ async function cmSelectCourse(id){
     // Carregar estado do novo curso (se existir)
     const stored = await cloudGetItem('jt3_'+id);
     if(stored){
-      try{ const p=JSON.parse(stored); state=Object.assign({done:{},notes:{},codes:{},logs:[],customTitles:{},activeCourseId:id},p); }catch(e){}
+      try{ const p=JSON.parse(stored); state=Object.assign({done:{},notes:{},codes:{},exercises:{},logs:[],customTitles:{},activeCourseId:id},p); }catch(e){}
     } else {
-      state={done:{},notes:{},codes:{},logs:[],customTitles:{},activeCourseId:id};
+      state={done:{},notes:{},codes:{},exercises:{},logs:[],customTitles:{},activeCourseId:id};
     }
     state.activeCourseId=id;
     await setLastActiveCourseId(id);

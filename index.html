@@ -3373,6 +3373,7 @@ function nsSummaryDownloadWord() {
       </td></tr>`;
       filtered.forEach(n => {
         const tc = typeColors[n.type] || typeColors.tip;
+        const imgsHTML = (n.imgs && n.imgs.length) ? `<div style="margin-top:6px">${n.imgs.map(img=>`<img src="${img}" style="max-width:260px;max-height:180px;border:1px solid #ddd;border-radius:4px;margin:2px 4px 2px 0"/>`).join('')}</div>` : '';
         secRows += `<tr>
           <td style="padding:8px 10px;vertical-align:top;width:90px;white-space:nowrap">
             <span style="background:${tc.bg};color:${tc.color};font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px">${tc.label}</span>
@@ -3380,6 +3381,7 @@ function nsSummaryDownloadWord() {
           <td style="padding:8px 10px;vertical-align:top">
             <div style="font-size:12px;font-weight:700;color:#1a1a18">${escHtml(n.title)}</div>
             ${n.body ? `<div style="font-size:11px;color:#555;margin-top:3px;line-height:1.5;white-space:pre-wrap">${escHtml(n.body)}</div>` : ''}
+            ${imgsHTML}
           </td>
           <td style="padding:8px 10px;vertical-align:top;font-size:10px;color:#aaa;white-space:nowrap">${n.date}</td>
         </tr>`;
@@ -3404,8 +3406,8 @@ function nsSummaryDownloadWord() {
   .summary-stats{display:inline-block;background:#f5f5f5;padding:8px 14px;border-radius:6px;margin-bottom:16px;font-size:11pt}
 </style>
 </head><body>
-<h1>☕ Java COMPLETO -- Sumário de Anotações</h1>
-<p class="hero-meta">Nelio Alves . Udemy . POO + Projetos . Gerado em ${date}</p>
+<h1>${ACTIVE_COURSE.icon||'🎓'} ${escHtml(ACTIVE_COURSE.name)} -- Sumário de Anotações</h1>
+<p class="hero-meta">${escHtml(ACTIVE_COURSE.instructor||'')}${ACTIVE_COURSE.platform?' . '+escHtml(ACTIVE_COURSE.platform):''} . Gerado em ${date}</p>
 <div class="summary-stats">
   📝 Total: <b>${allFlat.length}</b> anotações &nbsp;|&nbsp;
   💡 Dicas: <b>${typeCount.tip}</b> &nbsp;|&nbsp;
@@ -3420,7 +3422,7 @@ function nsSummaryDownloadWord() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `java-completo-sumario-anotacoes-${date.replace(/\//g, '-')}.doc`;
+  a.download = `${(state.activeCourseId||'curso')}-sumario-anotacoes-${date.replace(/\//g, '-')}.doc`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
@@ -5285,9 +5287,11 @@ function exportNotesPDF(secId, lessonN){
     const nt=NOTE_TYPES[n.type]||NOTE_TYPES.tip;
     const color=NOTE_COLORS[n.type]||'#185FA5';
     const tagsHTML=(n.tags&&n.tags.length)?`<div style="margin-top:6px">${n.tags.map(t=>`<span style="font-size:10px;background:#f0f7ff;color:#185FA5;padding:2px 7px;border-radius:10px;border:1px solid #c8ddf2;margin-right:4px">#${t}</span>`).join('')}</div>`:'';
+    const imgsHTML=(n.imgs&&n.imgs.length)?`<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px">${n.imgs.map(img=>`<img src="${img}" style="max-width:220px;max-height:160px;border-radius:6px;border:1px solid #ddd;object-fit:contain"/>`).join('')}</div>`:'';
     return `<div style="margin-bottom:10px;padding:10px 14px;border-left:4px solid ${color};border-radius:0 8px 8px 0;background:#f9f9f9">
       <div style="font-size:13px;font-weight:700;margin-bottom:4px">${NOTE_EMOJI[n.type]||''} ${escHtml(n.title)}</div>
       ${n.body?`<div style="font-size:12px;color:#444;line-height:1.6;white-space:pre-wrap">${escHtml(n.body)}</div>`:''}
+      ${imgsHTML}
       ${tagsHTML}
       <div style="font-size:10px;color:#aaa;margin-top:4px">${n.date}</div>
     </div>`;

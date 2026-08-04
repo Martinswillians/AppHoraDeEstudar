@@ -134,6 +134,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .ntb.sel-doubt{background:#FAEEDA;color:#633806;border-color:#BA7517}
 .ntb.sel-important{background:#EEEDFE;color:#3C3489;border-color:#534AB7}
 .ntb.sel-concept{background:#E6F1FB;color:#0C447C;border-color:#185FA5}
+.ntb.sel-question{background:#DFF7F0;color:#0F6B54;border-color:#0F9B7A}
 .note-inp-area{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
 .note-inp-area input,.note-inp-area textarea{font-size:13px;padding:8px 11px;border:1px solid #e8e6e0;border-radius:8px;background:#faf9f7;color:#1a1a18;font-family:inherit;outline:none;transition:border .15s}
 .note-inp-area input:focus,.note-inp-area textarea:focus{border-color:#185FA5;background:#fff}
@@ -146,6 +147,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .nb-doubt{background:#FAEEDA;color:#633806}
 .nb-important{background:#EEEDFE;color:#3C3489}
 .nb-concept{background:#E6F1FB;color:#0C447C}
+.nb-question{background:#DFF7F0;color:#0F6B54}
 .note-card-title{font-size:12px;font-weight:600;color:#1a1a18;flex:1}
 .note-card-body{font-size:12px;color:#666;line-height:1.6;white-space:pre-wrap}
 .note-actions{display:flex;gap:3px;margin-left:auto}
@@ -1785,8 +1787,9 @@ const NOTE_TYPES = {
   doubt:     {label:'Dúvida',    cls:'nb-doubt'},
   important: {label:'Importante',cls:'nb-important'},
   concept:   {label:'Conceito',  cls:'nb-concept'},
+  question:  {label:'Questão Respondida', cls:'nb-question'},
 };
-const NOTE_EMOJI = {tip:'💡',doubt:'❓',important:'⭐',concept:'📖'};
+const NOTE_EMOJI = {tip:'💡',doubt:'❓',important:'⭐',concept:'📖',question:'✅'};
 
 let state = {
   done:{}, notes:{}, codes:{}, logs:[], customTitles:{},
@@ -1799,7 +1802,7 @@ let state = {
 let activeKey = null;
 let curNoteType = 'tip';
 let curLang = 'java';
-let curLessonTab = 'notas'; // 'notas' | 'codigo' | 'exercicios'
+let curLessonTab = 'notas'; // 'notas' | 'codigo'
 let expCtx = {tab:'aula', secId:null, lessonN:null, expSecId:null};
 let globalCodeFilter = 'all';
 
@@ -2010,12 +2013,40 @@ async function load(){
       const p=JSON.parse(d);
       if(p && typeof p === 'object'){
         state=Object.assign({done:{},notes:{},codes:{},exercises:{},logs:[],customTitles:{},activeCourseId:state.activeCourseId||'java-completo'},p);
+        migrateExercisesIntoNotes();
         return;
       }
     }
   }catch(e){}
   // Nenhum dado na nuvem ainda para este curso: começa vazio
   state=Object.assign({done:{},notes:{},codes:{},exercises:{},logs:[],customTitles:{}}, {activeCourseId: state.activeCourseId||'java-completo'});
+}
+
+// Migração: a aba "Exercícios" separada virou o tipo de anotação "Questão Respondida".
+// Se o usuário já tinha exercícios salvos da versão antiga, converte cada um numa
+// anotação (tipo 'question') na mesma aula, preservando pergunta, resposta e data.
+function migrateExercisesIntoNotes(){
+  if(!state.exercises) return;
+  const keys=Object.keys(state.exercises);
+  if(!keys.length) return;
+  let changed=false;
+  keys.forEach(k=>{
+    const list=state.exercises[k]||[];
+    if(!list.length) return;
+    if(!state.notes[k]) state.notes[k]=[];
+    list.forEach(ex=>{
+      state.notes[k].push({
+        type:'question',
+        title: ex.question || 'Questão respondida',
+        body: ex.answer ? ('Resposta: '+ex.answer) : '',
+        tags: [],
+        date: ex.date || new Date().toLocaleDateString('pt-BR'),
+        imgs: [],
+      });
+    });
+    changed=true;
+  });
+  if(changed){ state.exercises={}; save(); }
 }
 
 // -- STATS ---------------------------------------------------
@@ -2365,7 +2396,6 @@ function dRenderLesson(secId,n){
   const title=state.customTitles[k]||lesson.t;
   const notes=state.notes[k]||[];
   const codes=state.codes[k]||[];
-  const exercises=(state.exercises&&state.exercises[k])||[];
   const area=document.getElementById('d-lesson-area');
   area.innerHTML=`
     <div class="lesson-detail">
@@ -2386,11 +2416,10 @@ function dRenderLesson(secId,n){
       <div class="sub-tabs">
         <button class="sub-tab-btn ${curLessonTab==='notas'?'active':''}" onclick="setLessonTab('notas','${secId}',${n})">📝 Anotações (${notes.length})</button>
         <button class="sub-tab-btn ${curLessonTab==='codigo'?'active':''}" onclick="setLessonTab('codigo','${secId}',${n})">💻 Código (${codes.length})</button>
-        <button class="sub-tab-btn ${curLessonTab==='exercicios'?'active':''}" onclick="setLessonTab('exercicios','${secId}',${n})">📚 Exercícios (${exercises.length})</button>
       </div>
       <div id="lpanel-notas" style="display:${curLessonTab==='notas'?'block':'none'}">
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px" id="d-nt-btns">
-          ${['tip','doubt','important','concept'].map(t=>`<button class="ntb ${curNoteType===t?'sel-'+t:''}" data-type="${t}" onclick="setNoteType(this)">${NOTE_EMOJI[t]} ${NOTE_TYPES[t].label}</button>`).join('')}
+          ${['tip','doubt','important','concept','question'].map(t=>`<button class="ntb ${curNoteType===t?'sel-'+t:''}" data-type="${t}" onclick="setNoteType(this)">${NOTE_EMOJI[t]} ${NOTE_TYPES[t].label}</button>`).join('')}
         </div>
         <div class="note-inp-area">
           <input type="text" id="d-note-title" placeholder="Título da anotação..."/>
@@ -2422,14 +2451,6 @@ function dRenderLesson(secId,n){
         </div>
         <div id="d-codes-${k}">${renderCodesHTML(k,secId,n)}</div>
       </div>
-      <div id="lpanel-exercicios" style="display:${curLessonTab==='exercicios'?'block':'none'}">
-        <div class="note-inp-area">
-          <textarea id="d-ex-question" placeholder="Enunciado do exercício..." style="min-height:60px"></textarea>
-          <textarea id="d-ex-answer" placeholder="Resposta / resolução (opcional, fica escondida até você clicar em 'Ver resposta')..." style="min-height:60px"></textarea>
-          <button class="btn-add-note" onclick="addExercise('${k}','${secId}',${n})">+ Adicionar exercício</button>
-        </div>
-        <div id="d-exercises-${k}">${renderExercisesHTML(k,secId,n)}</div>
-      </div>
     </div>`;
 }
 
@@ -2437,11 +2458,9 @@ function setLessonTab(tab,secId,n){
   curLessonTab=tab;
   const pn=document.getElementById('lpanel-notas');
   const pc=document.getElementById('lpanel-codigo');
-  const pe=document.getElementById('lpanel-exercicios');
   if(pn) pn.style.display=tab==='notas'?'block':'none';
   if(pc) pc.style.display=tab==='codigo'?'block':'none';
-  if(pe) pe.style.display=tab==='exercicios'?'block':'none';
-  document.querySelectorAll('.sub-tab-btn').forEach((b,i)=>b.classList.toggle('active',['notas','codigo','exercicios'][i]===tab));
+  document.querySelectorAll('.sub-tab-btn').forEach((b,i)=>b.classList.toggle('active',['notas','codigo'][i]===tab));
 }
 function setNoteType(btn){ curNoteType=btn.dataset.type; document.querySelectorAll('#d-nt-btns .ntb').forEach(b=>{b.className='ntb';if(b.dataset.type===curNoteType)b.classList.add('sel-'+curNoteType);}); }
 function setLang(btn){ curLang=btn.dataset.lang; document.querySelectorAll('#d-lang-btns .lang-btn').forEach(b=>{b.className='lang-btn';if(b.dataset.lang===curLang)b.classList.add('sel');}); }
@@ -2616,8 +2635,8 @@ function dRenderGlobalNotes(){
   }));
   const filtered=gNoteFilter==='all'?all:all.filter(n=>n.type===gNoteFilter);
   area.innerHTML=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-    ${['all','tip','doubt','important','concept'].map(t=>{
-      const labels={all:'Todas',tip:'💡 Dicas',doubt:'❓ Dúvidas',important:'⭐ Imp.',concept:'📖 Conc.'};
+    ${['all','tip','doubt','important','concept','question'].map(t=>{
+      const labels={all:'Todas',tip:'💡 Dicas',doubt:'❓ Dúvidas',important:'⭐ Imp.',concept:'📖 Conc.',question:'✅ Questões'};
       return `<button class="ntb ${gNoteFilter===t&&t!=='all'?'sel-'+t:''}" style="${gNoteFilter===t&&t==='all'?'background:#f0eeea;color:#1a1a18;border-color:#888':''}" onclick="setGNoteFilter('${t}')">${labels[t]}</button>`;
     }).join('')}
   </div>
@@ -2673,62 +2692,6 @@ function renderCodesHTML(k,secId,n){
 function deleteCode(k,id,secId,n){
   if(!state.codes[k]) return; state.codes[k]=state.codes[k].filter(c=>c.id!==id); save(); updateStats();
   dRenderLesson(secId,n); setLessonTab('codigo',secId,n); dRenderGlobalCode(); mRenderCode();
-}
-// -- EXERCÍCIOS -------------------------------------------------
-function addExercise(k,secId,n){
-  const qi=document.getElementById('d-ex-question'); const ai=document.getElementById('d-ex-answer');
-  const question=qi?.value.trim(); const answer=ai?.value.trim();
-  if(!question) return;
-  if(!state.exercises) state.exercises={};
-  if(!state.exercises[k]) state.exercises[k]=[];
-  state.exercises[k].push({id:Date.now(), question, answer, status:null, date:new Date().toLocaleDateString('pt-BR')});
-  if(qi) qi.value=''; if(ai) ai.value='';
-  save(); updateStats(); dRenderLesson(secId,n); setLessonTab('exercicios',secId,n);
-}
-function mAddExercise(k,secId,n){
-  const qi=document.getElementById('m-ex-question'); const ai=document.getElementById('m-ex-answer');
-  const question=qi?.value.trim(); const answer=ai?.value.trim();
-  if(!question) return;
-  if(!state.exercises) state.exercises={};
-  if(!state.exercises[k]) state.exercises[k]=[];
-  state.exercises[k].push({id:Date.now(), question, answer, status:null, date:new Date().toLocaleDateString('pt-BR')});
-  if(qi) qi.value=''; if(ai) ai.value='';
-  save(); updateStats(); mRenderLesson(secId,n); mSetLessonTab('exercicios',secId,n);
-}
-function renderExercisesHTML(k,secId,n){
-  const list=(state.exercises&&state.exercises[k])||[];
-  if(!list.length) return `<div class="empty" style="padding:16px">Nenhum exercício ainda. Adicione acima!</div>`;
-  return list.map(ex=>{
-    const statusBadge = ex.status==='correct'
-      ? '<span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:10px;background:#1D9E7522;color:#1D9E75">✓ Acertei</span>'
-      : ex.status==='wrong'
-        ? '<span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:10px;background:#ef444422;color:#ef4444">✗ Errei</span>'
-        : '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:#f0eeea;color:#999">Não respondido</span>';
-    return `<div class="code-block" id="ex-${ex.id}" style="padding:13px 15px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px">
-        <div style="font-size:13px;font-weight:700;color:#1a1a18;white-space:pre-wrap;flex:1;line-height:1.5">${escHtml(ex.question)}</div>
-        <button class="code-icon-btn" onclick="deleteExercise('${k}',${ex.id},'${secId}',${n})" style="color:#f87171">✕</button>
-      </div>
-      ${ex.answer ? `<details style="margin-bottom:9px"><summary style="cursor:pointer;font-size:12px;color:#185FA5;font-weight:700">Ver resposta</summary><div style="font-size:12px;color:#444;white-space:pre-wrap;margin-top:6px;line-height:1.6;padding:8px 10px;background:#f7f6f3;border-radius:7px">${escHtml(ex.answer)}</div></details>` : ''}
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        ${statusBadge}
-        <button onclick="markExercise('${k}',${ex.id},'correct','${secId}',${n})" style="font-size:11px;padding:5px 11px;border-radius:8px;border:1.5px solid #1D9E75;background:${ex.status==='correct'?'#1D9E75':'transparent'};color:${ex.status==='correct'?'#fff':'#1D9E75'};cursor:pointer;font-weight:700">✓ Acertei</button>
-        <button onclick="markExercise('${k}',${ex.id},'wrong','${secId}',${n})" style="font-size:11px;padding:5px 11px;border-radius:8px;border:1.5px solid #ef4444;background:${ex.status==='wrong'?'#ef4444':'transparent'};color:${ex.status==='wrong'?'#fff':'#ef4444'};cursor:pointer;font-weight:700">✗ Errei</button>
-        <span style="font-size:10px;color:#aaa;margin-left:auto">${ex.date}</span>
-      </div>
-    </div>`;
-  }).join('');
-}
-function deleteExercise(k,id,secId,n){
-  if(!state.exercises || !state.exercises[k]) return;
-  state.exercises[k]=state.exercises[k].filter(e=>e.id!==id);
-  save(); updateStats(); dRenderLesson(secId,n); setLessonTab('exercicios',secId,n); mRenderLesson(secId,n); mSetLessonTab('exercicios',secId,n);
-}
-function markExercise(k,id,status,secId,n){
-  if(!state.exercises || !state.exercises[k]) return;
-  const ex=state.exercises[k].find(e=>e.id===id); if(!ex) return;
-  ex.status = ex.status===status ? null : status; // clicar de novo no mesmo status desmarca
-  save(); updateStats(); dRenderLesson(secId,n); setLessonTab('exercicios',secId,n); mRenderLesson(secId,n); mSetLessonTab('exercicios',secId,n);
 }
 
 function editCode(k,id,secId,n){
@@ -3307,14 +3270,15 @@ function renderNotesSummary(targetId, isMobileView) {
   const allFlat = getAllNotesFlat('all', 'all');
   const grouped = getAllNotesGrouped();
   const secCount = grouped.length;
-  const typeCount = { tip: 0, doubt: 0, important: 0, concept: 0 };
+  const typeCount = { tip: 0, doubt: 0, important: 0, concept: 0, question: 0 };
   allFlat.forEach(n => { if (typeCount[n.type] !== undefined) typeCount[n.type]++; });
 
   const typeColors = {
     tip: { bg: '#EAF3DE', color: '#27500A', label: '💡 Dicas' },
     doubt: { bg: '#FAEEDA', color: '#633806', label: '❓ Dúvidas' },
     important: { bg: '#EEEDFE', color: '#3C3489', label: '⭐ Imp.' },
-    concept: { bg: '#E6F1FB', color: '#0C447C', label: '📖 Conc.' }
+    concept: { bg: '#E6F1FB', color: '#0C447C', label: '📖 Conc.' },
+    question: { bg: '#DFF7F0', color: '#0F6B54', label: '✅ Questões' }
   };
 
   if (!allFlat.length) {
@@ -3385,6 +3349,7 @@ function renderNotesSummary(targetId, isMobileView) {
         <div class="ns-stat"><div class="ns-stat-n" style="color:#FAEEDA">${typeCount.doubt}</div><div class="ns-stat-l">Dúvidas</div></div>
         <div class="ns-stat"><div class="ns-stat-n" style="color:#EEEDFE">${typeCount.important}</div><div class="ns-stat-l">Imp.</div></div>
         <div class="ns-stat"><div class="ns-stat-n" style="color:#E6F1FB">${typeCount.concept}</div><div class="ns-stat-l">Conc.</div></div>
+        <div class="ns-stat"><div class="ns-stat-n" style="color:#DFF7F0">${typeCount.question}</div><div class="ns-stat-l">Quest.</div></div>
         <div class="ns-stat"><div class="ns-stat-n">${secCount}</div><div class="ns-stat-l">Seções</div></div>
       </div>
     </div>
@@ -3426,9 +3391,10 @@ function nsSummaryDownloadWord() {
     tip:       { bg: '#EAF3DE', color: '#27500A', label: '💡 Dica' },
     doubt:     { bg: '#FAEEDA', color: '#633806', label: '❓ Dúvida' },
     important: { bg: '#EEEDFE', color: '#3C3489', label: '⭐ Importante' },
-    concept:   { bg: '#E6F1FB', color: '#0C447C', label: '📖 Conceito' }
+    concept:   { bg: '#E6F1FB', color: '#0C447C', label: '📖 Conceito' },
+    question:  { bg: '#DFF7F0', color: '#0F6B54', label: '✅ Questão Respondida' }
   };
-  const typeCount = { tip: 0, doubt: 0, important: 0, concept: 0 };
+  const typeCount = { tip: 0, doubt: 0, important: 0, concept: 0, question: 0 };
   allFlat.forEach(n => { if (typeCount[n.type] !== undefined) typeCount[n.type]++; });
 
   let rows = '';
@@ -3605,7 +3571,6 @@ function mRenderLesson(secId,n){
   const title=state.customTitles[k]||lesson.t;
   document.getElementById('m-aula-ttl').textContent=title;
   const notes=state.notes[k]||[]; const codes=state.codes[k]||[];
-  const exercises=(state.exercises&&state.exercises[k])||[];
   const mlt=window._mLessonTab||'notas';
   const body=document.getElementById('m-aula-body');
   body.innerHTML=`
@@ -3630,12 +3595,11 @@ function mRenderLesson(secId,n){
       <div style="display:flex;gap:0;border-bottom:1px solid #e8e6e0;margin-bottom:12px">
         <button style="flex:1;padding:9px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid ${mlt==='notas'?'#185FA5':'transparent'};color:${mlt==='notas'?'#1a1a18':'#888'}" onclick="mSetLessonTab('notas','${secId}',${n})">📝 Notas (${notes.length})</button>
         <button style="flex:1;padding:9px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid ${mlt==='codigo'?'#534AB7':'transparent'};color:${mlt==='codigo'?'#1a1a18':'#888'}" onclick="mSetLessonTab('codigo','${secId}',${n})">💻 Código (${codes.length})</button>
-        <button style="flex:1;padding:9px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid ${mlt==='exercicios'?'#f97316':'transparent'};color:${mlt==='exercicios'?'#1a1a18':'#888'}" onclick="mSetLessonTab('exercicios','${secId}',${n})">📚 Exerc. (${exercises.length})</button>
       </div>
       <!-- NOTAS panel -->
       <div id="m-panel-notas" style="display:${mlt==='notas'?'block':'none'}">
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px" id="m-nt-btns">
-          ${['tip','doubt','important','concept'].map(t=>`<button class="ntb ${curNoteType===t?'sel-'+t:''}" data-type="${t}" onclick="mSetNoteType(this)">${NOTE_EMOJI[t]} ${NOTE_TYPES[t].label}</button>`).join('')}
+          ${['tip','doubt','important','concept','question'].map(t=>`<button class="ntb ${curNoteType===t?'sel-'+t:''}" data-type="${t}" onclick="mSetNoteType(this)">${NOTE_EMOJI[t]} ${NOTE_TYPES[t].label}</button>`).join('')}
         </div>
         <input type="text" id="m-note-title" placeholder="Título da anotação..." style="display:block;width:100%;font-size:14px;padding:11px 12px;border:1px solid #e8e6e0;border-radius:10px;background:#faf9f7;color:#1a1a18;font-family:inherit;outline:none;margin-bottom:8px"/>
         <textarea id="m-note-body" placeholder="Dica, dúvida ou conceito..." onpaste="handlePaste(event,'m-img-preview')" style="display:block;width:100%;font-size:14px;padding:11px 12px;border:1px solid #e8e6e0;border-radius:10px;background:#faf9f7;color:#1a1a18;font-family:inherit;outline:none;resize:none;height:85px;line-height:1.6;margin-bottom:8px"></textarea>
@@ -3657,20 +3621,12 @@ function mRenderLesson(secId,n){
         <button onclick="mAddCode('${k}','${secId}',${n})" style="display:block;width:100%;padding:13px;border:none;border-radius:10px;background:#534AB7;color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:13px">+ Salvar código</button>
         <div id="m-codes-${k}">${renderCodesHTML(k,secId,n)}</div>
       </div>
-      <!-- EXERCÍCIOS panel -->
-      <div id="m-panel-exercicios" style="display:${mlt==='exercicios'?'block':'none'}">
-        <textarea id="m-ex-question" placeholder="Enunciado do exercício..." style="display:block;width:100%;font-size:14px;padding:11px 12px;border:1px solid #e8e6e0;border-radius:10px;background:#faf9f7;color:#1a1a18;font-family:inherit;outline:none;resize:none;height:70px;line-height:1.6;margin-bottom:8px"></textarea>
-        <textarea id="m-ex-answer" placeholder="Resposta / resolução (opcional)..." style="display:block;width:100%;font-size:14px;padding:11px 12px;border:1px solid #e8e6e0;border-radius:10px;background:#faf9f7;color:#1a1a18;font-family:inherit;outline:none;resize:none;height:70px;line-height:1.6;margin-bottom:8px"></textarea>
-        <button onclick="mAddExercise('${k}','${secId}',${n})" style="display:block;width:100%;padding:13px;border:none;border-radius:10px;background:#f97316;color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:13px">+ Adicionar exercício</button>
-        <div id="m-exercises-${k}">${renderExercisesHTML(k,secId,n)}</div>
-      </div>
     </div>`;
 }
 function mSetLessonTab(tab,secId,n){
   window._mLessonTab=tab;
   document.getElementById('m-panel-notas').style.display=tab==='notas'?'block':'none';
   document.getElementById('m-panel-codigo').style.display=tab==='codigo'?'block':'none';
-  const pe=document.getElementById('m-panel-exercicios'); if(pe) pe.style.display=tab==='exercicios'?'block':'none';
 }
 function mSetNoteType(btn){ curNoteType=btn.dataset.type; document.querySelectorAll('#m-nt-btns .ntb').forEach(b=>{b.className='ntb';if(b.dataset.type===curNoteType)b.classList.add('sel-'+curNoteType);}); }
 function mSetLang(btn){ curLang=btn.dataset.lang; document.querySelectorAll('#m-lang-btns .lang-btn').forEach(b=>{b.className='lang-btn';if(b.dataset.lang===curLang)b.classList.add('sel');}); }
@@ -5356,7 +5312,7 @@ function exportNotesPDF(secId, lessonN){
   const k      = (secId && lessonN) ? lk(secId, lessonN) : null;
   const notes  = k ? (state.notes[k]||[]) : null;
 
-  const NOTE_COLORS = {tip:'#185FA5', doubt:'#f97316', important:'#ef4444', concept:'#1D9E75'};
+  const NOTE_COLORS = {tip:'#185FA5', doubt:'#f97316', important:'#ef4444', concept:'#1D9E75', question:'#0F9B7A'};
 
   let html = `<div style="font-family:system-ui,sans-serif;max-width:800px;margin:0 auto">
     <div style="text-align:center;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #1a1a18">

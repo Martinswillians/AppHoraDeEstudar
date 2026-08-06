@@ -2908,13 +2908,13 @@ function addQuiz(k,secId,n){
 function qzAnswerTF(k,id,ans,secId,n){
   const q=state.quizzes[k]?.find(q=>q.id===id); if(!q) return;
   q.answered=ans;
-  qzAutoLogIfEnabled(k,secId,n);
+  qzAutoLogIfEnabled(secId,n,ans===q.correct);
   save(); dRenderLesson(secId,n); setLessonTab('quiz',secId,n);
 }
 function qzAnswerMC(k,id,optIdx,secId,n){
   const q=state.quizzes[k]?.find(q=>q.id===id); if(!q) return;
   q.answered=optIdx;
-  qzAutoLogIfEnabled(k,secId,n);
+  qzAutoLogIfEnabled(secId,n,optIdx===q.correct);
   save(); dRenderLesson(secId,n); setLessonTab('quiz',secId,n);
 }
 function deleteQuiz(k,id,secId,n){
@@ -2929,30 +2929,27 @@ function qzClearAnswers(k,secId,n){
 function qzSetAutoLog(checked){
   state.quizAutoLog=checked; save();
 }
-function qzAutoLogIfEnabled(k,secId,n){
+// Agrupa TODAS as respostas de exercícios do dia (de qualquer seção/aula) num único
+// registro do Diário, somando quantas foram respondidas, quantas corretas, e listando
+// as matérias (seções) tocadas naquele dia — em vez de fingir um tempo estudado.
+function qzAutoLogIfEnabled(secId,n,isCorrect){
   if(!state.quizAutoLog) return;
   const today=todayStr();
   const sec=SECTIONS.find(s=>s.id===secId);
-  const secLabel=sec?'S'+sec.num+': '+sec.title:'';
-  const lesson=sec?.lessons.find(l=>l.n===n);
-  const lessonLabel=lesson?(state.customTitles[k]||lesson.t):'';
-  const totalAnswered=(state.quizzes[k]||[]).filter(q=>q.answered!==undefined).length;
-  const totalCorrect=(state.quizzes[k]||[]).filter(q=>{
-    if(q.type==='tf') return q.answered===q.correct;
-    return q.answered===q.correct;
-  }).length;
+  const secLabel=sec?('S'+sec.num+': '+sec.title):'';
   if(!state.activityDays) state.activityDays={};
   state.activityDays[today]=true;
-  // Agrupamos todas as respostas de questões do mesmo dia/seção/aula em 1 registro
-  let entry=state.logs.find(l=>l.date===today&&l._quizKey===k);
-  const desc=`📋 Exercícios — ${totalAnswered} respondidas · ${totalCorrect} corretas · ${secLabel}${lessonLabel?' · '+lessonLabel:''}`;
-  if(entry){
-    entry.desc=desc;
-    entry.hours=Math.round((totalAnswered*0.05)*100)/100; // ~3min por questão
-  } else {
-    state.logs.unshift({id:Date.now(),date:today,hours:Math.round((totalAnswered*0.05)*100)/100,sec:secId,secs:[secId],desc,_quizKey:k});
+  let entry=state.logs.find(l=>l.date===today&&l.autoQuiz);
+  if(!entry){
+    entry={id:Date.now(),date:today,hours:0,sec:'',secs:[],desc:'',autoQuiz:true,quizAnswered:0,quizCorrect:0,quizSubjects:[]};
+    state.logs.unshift(entry);
   }
-  updateStats(); renderLogList(); mRenderLog();
+  entry.quizAnswered=(entry.quizAnswered||0)+1;
+  entry.quizCorrect=(entry.quizCorrect||0)+(isCorrect?1:0);
+  entry.quizSubjects=entry.quizSubjects||[];
+  if(secLabel && !entry.quizSubjects.includes(secLabel)) entry.quizSubjects.push(secLabel);
+  entry.desc=`📋 ${entry.quizAnswered} questão(ões) respondida(s) · ${entry.quizCorrect} corretas`+(entry.quizSubjects.length?' · '+entry.quizSubjects.join(', '):'');
+  save(); updateStats(); renderLogList(); mRenderLog();
 }
 
 function editCode(k,id,secId,n){
@@ -3293,14 +3290,17 @@ function renderLogList(){
   const sm={}; SECTIONS.forEach(s=>sm[s.id]=s);
   target.innerHTML=getSortedLogs().map(l=>{
     const [y,m,d]=l.date.split('-');
+    const titleTxt = l.autoQuiz ? '📋 Exercícios do dia' : logSectionLabel(l,sm);
+    const valTxt = l.autoQuiz ? `${l.quizAnswered||0} questões` : `${formatHoursHM(l.hours)}h`;
+    const subLbl = l.autoQuiz ? `${l.quizCorrect||0} corretas` : 'estudadas';
     return `<div class="log-card">
       <div class="log-date-blk"><div class="log-day">${d}</div><div class="log-month">${months[parseInt(m)-1]}</div></div>
       <div class="log-sep"></div>
       <div class="log-body">
-        <div class="log-title-txt">${logSectionLabel(l,sm)}</div>
+        <div class="log-title-txt">${titleTxt}</div>
         ${l.desc?`<div class="log-desc-txt">${l.desc}</div>`:''}
       </div>
-      <div style="text-align:right;flex-shrink:0"><div class="log-h">${formatHoursHM(l.hours)}h</div><div class="log-hl">estudadas</div></div>
+      <div style="text-align:right;flex-shrink:0"><div class="log-h">${valTxt}</div><div class="log-hl">${subLbl}</div></div>
       <button class="del-btn" onclick="deleteLog(${l.id})" style="font-size:13px">✕</button>
     </div>`;
   }).join('');
@@ -4150,14 +4150,16 @@ function mRenderLog(){
   const sm={}; SECTIONS.forEach(s=>sm[s.id]=s);
   c.innerHTML=getSortedLogs().map(l=>{
     const [y,m,d]=l.date.split('-');
+    const titleTxt = l.autoQuiz ? '📋 Exercícios do dia' : logSectionLabel(l,sm);
+    const valTxt = l.autoQuiz ? `${l.quizAnswered||0} questões` : `${formatHoursHM(l.hours)}h`;
     return `<div class="log-card" style="margin-bottom:8px">
       <div class="log-date-blk"><div class="log-day">${d}</div><div class="log-month">${months[parseInt(m)-1]}</div></div>
       <div class="log-sep"></div>
       <div class="log-body">
-        <div class="log-title-txt">${logSectionLabel(l,sm)}</div>
+        <div class="log-title-txt">${titleTxt}</div>
         ${l.desc?`<div class="log-desc-txt">${l.desc}</div>`:''}
       </div>
-      <div style="text-align:right;flex-shrink:0"><div class="log-h">${formatHoursHM(l.hours)}h</div></div>
+      <div style="text-align:right;flex-shrink:0"><div class="log-h">${valTxt}</div></div>
       <button class="del-btn" onclick="deleteLog(${l.id})" style="font-size:13px">✕</button>
     </div>`;
   }).join('');
@@ -6736,5 +6738,4 @@ authGate();
     </div>
   </div>
 </body>
-  
 </html>

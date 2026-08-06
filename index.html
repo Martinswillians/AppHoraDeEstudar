@@ -2757,6 +2757,7 @@ function renderQuizPanel(k,secId,n){
         Auto-registrar no Diário
       </label>
     </div>
+    <div id="d-qz-err" style="display:none;font-size:12px;font-weight:700;color:#D9534F;margin-top:8px;padding:8px 12px;background:#FDEDEC;border-radius:8px;border:1px solid #f5c6cb"></div>
   </div>
   ${list.length===0 ? '<div class="empty" style="padding:20px 0">Nenhum exercício ainda. Adicione acima!</div>' : `
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -2865,8 +2866,15 @@ function qzSetCorrect(i){ _qzMcOpts.forEach((o,j)=>o.correct=j===i); }
 function qzAddOpt(){ if(_qzMcOpts.length<5) _qzMcOpts.push({text:'',correct:false}); qzRenderOpts(); }
 
 function addQuiz(k,secId,n){
-  const stmt=document.getElementById('d-qz-stmt')?.value.trim();
-  if(!stmt){ alert('Escreva o enunciado da questão.'); return; }
+  const stmtEl=document.getElementById('d-qz-stmt');
+  const errEl=document.getElementById('d-qz-err');
+  const stmt=stmtEl?.value.trim();
+  if(errEl) errEl.textContent='';
+  if(!stmt){
+    if(errEl){ errEl.textContent='⚠️ Escreva o enunciado da questão antes de adicionar.'; errEl.style.display='block'; }
+    stmtEl?.focus();
+    return;
+  }
   const type=document.getElementById('d-qz-type')?.value||'tf';
   if(!state.quizzes) state.quizzes={};
   if(!state.quizzes[k]) state.quizzes[k]=[];
@@ -2874,14 +2882,26 @@ function addQuiz(k,secId,n){
     const ans=[...document.querySelectorAll('[name="d-qz-tf-ans"]')].find(r=>r.checked)?.value||'C';
     state.quizzes[k].push({id:Date.now(),type:'tf',statement:stmt,correct:ans,answered:undefined});
   } else {
+    // Ler os valores dos inputs diretamente do DOM (garantia extra para mobile)
+    const optsEl=document.getElementById('d-qz-opts');
+    if(optsEl){
+      optsEl.querySelectorAll('input[type=text]').forEach((inp,i)=>{
+        if(_qzMcOpts[i]!==undefined) _qzMcOpts[i].text=inp.value;
+      });
+      const radios=optsEl.querySelectorAll('input[type=radio]');
+      radios.forEach((r,i)=>{ if(_qzMcOpts[i]) _qzMcOpts[i].correct=r.checked; });
+    }
     const opts=_qzMcOpts.map(o=>o.text.trim()).filter(Boolean);
-    if(opts.length<2){ alert('Adicione pelo menos 2 alternativas.'); return; }
+    if(opts.length<2){
+      if(errEl){ errEl.textContent='⚠️ Adicione pelo menos 2 alternativas.'; errEl.style.display='block'; }
+      return;
+    }
     const correctIdx=_qzMcOpts.findIndex(o=>o.correct);
     const clampedCorrect=Math.min(correctIdx<0?0:correctIdx,opts.length-1);
     state.quizzes[k].push({id:Date.now(),type:'mc',statement:stmt,options:opts,correct:clampedCorrect,answered:undefined});
     _qzMcOpts=[{text:'',correct:true},{text:'',correct:false}];
   }
-  document.getElementById('d-qz-stmt').value='';
+  if(stmtEl) stmtEl.value='';
   save(); updateStats(); dRenderLesson(secId,n); setLessonTab('quiz',secId,n);
 }
 

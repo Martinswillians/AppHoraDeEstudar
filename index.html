@@ -141,6 +141,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .note-inp-area textarea{resize:vertical;min-height:75px;line-height:1.6}
 .btn-add-note{font-size:12px;font-weight:700;padding:8px 18px;background:#1a1a18;color:#fff;border:none;border-radius:8px;cursor:pointer;align-self:flex-start}
 .note-card{background:#faf9f7;border:1px solid #e8e6e0;border-radius:9px;padding:11px 13px;margin-bottom:7px}
+.quiz-card{background:#fff;border:1px solid #e8e6e0;border-radius:11px;padding:15px 16px;margin-bottom:12px}
+.quiz-statement{font-size:13.5px;font-weight:600;color:#1a1a18;line-height:1.65;white-space:pre-wrap}
+.quiz-opt{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid #e8e6e0;border-radius:9px;margin-bottom:7px;cursor:pointer;font-size:13px;color:#1a1a18;background:#faf9f7}
+.quiz-opt:hover{border-color:#c8ddf2}
+.quiz-opt input[type=radio]{margin:0;flex-shrink:0}
+.quiz-opt.correct{background:#EAF3DE;border-color:#639922;color:#27500A;font-weight:700}
+.quiz-opt.wrong{background:#FCEBEA;border-color:#D9534F;color:#A32D2D;font-weight:700}
+.quiz-letter{font-weight:800;color:#888;width:18px;flex-shrink:0}
+.qz-type-select{font-size:13px;padding:8px 10px;border:1px solid #e8e6e0;border-radius:8px;background:#faf9f7;color:#1a1a18;font-family:inherit}
+.qz-mc-row{display:flex;align-items:center;gap:8px;margin-top:6px}
+.qz-mc-row input[type=text]{flex:1;padding:7px 10px;border:1px solid #e8e6e0;border-radius:7px;background:#faf9f7;color:#1a1a18;font-family:inherit;font-size:13px;outline:none}
 .note-card-hdr{display:flex;align-items:center;gap:7px;margin-bottom:5px}
 .note-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;flex-shrink:0}
 .nb-tip{background:#EAF3DE;color:#27500A}
@@ -2012,14 +2023,14 @@ async function load(){
     if(d){
       const p=JSON.parse(d);
       if(p && typeof p === 'object'){
-        state=Object.assign({done:{},notes:{},codes:{},exercises:{},logs:[],customTitles:{},activeCourseId:state.activeCourseId||'java-completo'},p);
+        state=Object.assign({done:{},notes:{},codes:{},exercises:{},quizzes:{},logs:[],customTitles:{},activeCourseId:state.activeCourseId||'java-completo'},p);
         migrateExercisesIntoNotes();
         return;
       }
     }
   }catch(e){}
   // Nenhum dado na nuvem ainda para este curso: começa vazio
-  state=Object.assign({done:{},notes:{},codes:{},exercises:{},logs:[],customTitles:{}}, {activeCourseId: state.activeCourseId||'java-completo'});
+  state=Object.assign({done:{},notes:{},codes:{},exercises:{},quizzes:{},logs:[],customTitles:{}}, {activeCourseId: state.activeCourseId||'java-completo'});
 }
 
 // Migração: a aba "Exercícios" separada virou o tipo de anotação "Questão Respondida".
@@ -2396,6 +2407,7 @@ function dRenderLesson(secId,n){
   const title=state.customTitles[k]||lesson.t;
   const notes=state.notes[k]||[];
   const codes=state.codes[k]||[];
+  const quizzes=(state.quizzes&&state.quizzes[k])||[];
   const area=document.getElementById('d-lesson-area');
   area.innerHTML=`
     <div class="lesson-detail">
@@ -2416,6 +2428,7 @@ function dRenderLesson(secId,n){
       <div class="sub-tabs">
         <button class="sub-tab-btn ${curLessonTab==='notas'?'active':''}" onclick="setLessonTab('notas','${secId}',${n})">📝 Anotações (${notes.length})</button>
         <button class="sub-tab-btn ${curLessonTab==='codigo'?'active':''}" onclick="setLessonTab('codigo','${secId}',${n})">💻 Código (${codes.length})</button>
+        <button class="sub-tab-btn ${curLessonTab==='quiz'?'active':''}" onclick="setLessonTab('quiz','${secId}',${n})" style="${curLessonTab==='quiz'?'border-color:#f97316;color:#f97316':''}">📋 Exercícios (${quizzes.length})</button>
       </div>
       <div id="lpanel-notas" style="display:${curLessonTab==='notas'?'block':'none'}">
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px" id="d-nt-btns">
@@ -2451,6 +2464,9 @@ function dRenderLesson(secId,n){
         </div>
         <div id="d-codes-${k}">${renderCodesHTML(k,secId,n)}</div>
       </div>
+      <div id="lpanel-quiz" style="display:${curLessonTab==='quiz'?'block':'none'};padding-top:4px">
+        ${renderQuizPanel(k,secId,n)}
+      </div>
     </div>`;
 }
 
@@ -2458,9 +2474,14 @@ function setLessonTab(tab,secId,n){
   curLessonTab=tab;
   const pn=document.getElementById('lpanel-notas');
   const pc=document.getElementById('lpanel-codigo');
+  const pq=document.getElementById('lpanel-quiz');
   if(pn) pn.style.display=tab==='notas'?'block':'none';
   if(pc) pc.style.display=tab==='codigo'?'block':'none';
-  document.querySelectorAll('.sub-tab-btn').forEach((b,i)=>b.classList.toggle('active',['notas','codigo'][i]===tab));
+  if(pq) pq.style.display=tab==='quiz'?'block':'none';
+  document.querySelectorAll('.sub-tab-btn').forEach((b,i)=>{
+    b.classList.toggle('active',['notas','codigo','quiz'][i]===tab);
+    if(['notas','codigo','quiz'][i]==='quiz') b.style.color=tab==='quiz'?'#f97316':'';
+  });
 }
 function setNoteType(btn){ curNoteType=btn.dataset.type; document.querySelectorAll('#d-nt-btns .ntb').forEach(b=>{b.className='ntb';if(b.dataset.type===curNoteType)b.classList.add('sel-'+curNoteType);}); }
 function setLang(btn){ curLang=btn.dataset.lang; document.querySelectorAll('#d-lang-btns .lang-btn').forEach(b=>{b.className='lang-btn';if(b.dataset.lang===curLang)b.classList.add('sel');}); }
@@ -2692,6 +2713,226 @@ function renderCodesHTML(k,secId,n){
 function deleteCode(k,id,secId,n){
   if(!state.codes[k]) return; state.codes[k]=state.codes[k].filter(c=>c.id!==id); save(); updateStats();
   dRenderLesson(secId,n); setLessonTab('codigo',secId,n); dRenderGlobalCode(); mRenderCode();
+}
+
+// ── QUIZ / EXERCÍCIOS ──────────────────────────────────────────
+// Renderiza o painel completo: formulário de criação + lista de questões
+function renderQuizPanel(k,secId,n){
+  const list=(state.quizzes&&state.quizzes[k])||[];
+  const autoOn=!!state.quizAutoLog;
+  const doneCnt=list.filter(q=>q.answered!==undefined).length;
+  return `
+  <div class="note-inp-area" style="margin-bottom:14px">
+    <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px">Nova questão</div>
+    <textarea id="d-qz-stmt" placeholder="Enunciado da questão..." style="min-height:72px;resize:vertical"></textarea>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:7px;flex-wrap:wrap">
+      <label style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase">Tipo:</label>
+      <select id="d-qz-type" class="qz-type-select" onchange="qzToggleForm()">
+        <option value="tf">Certo / Errado</option>
+        <option value="mc">Múltipla Escolha</option>
+      </select>
+    </div>
+    <!-- Certo/Errado: escolha a resposta correta antes de adicionar -->
+    <div id="d-qz-tf" style="margin-top:9px">
+      <label style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;display:block;margin-bottom:6px">Resposta correta:</label>
+      <div style="display:flex;gap:8px">
+        <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;padding:10px 12px;border:1.5px solid #e8e6e0;border-radius:9px;font-size:13px;background:#faf9f7">
+          <input type="radio" name="d-qz-tf-ans" value="C" checked/> <span style="width:24px;height:24px;border-radius:50%;background:#185FA5;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0">C</span> Certo
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;padding:10px 12px;border:1.5px solid #e8e6e0;border-radius:9px;font-size:13px;background:#faf9f7">
+          <input type="radio" name="d-qz-tf-ans" value="E"/> <span style="width:24px;height:24px;border-radius:50%;background:#185FA5;color:#fff;display:flex;align-items:center;justify-content:circle-50%;font-size:12px;font-weight:800;flex-shrink:0;align-items:center;justify-content:center">E</span> Errado
+        </label>
+      </div>
+    </div>
+    <!-- Múltipla Escolha: alternativas -->
+    <div id="d-qz-mc" style="display:none;margin-top:9px">
+      <label style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;display:block;margin-bottom:6px">Alternativas (marque a correta):</label>
+      <div id="d-qz-opts"></div>
+      <button onclick="qzAddOpt()" style="margin-top:4px;background:none;border:1.5px dashed #c8ddf2;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;color:#185FA5;cursor:pointer;width:100%">+ Alternativa</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn-add-note" style="flex:1" onclick="addQuiz('${k}','${secId}',${n})">+ Adicionar exercício</button>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#444;cursor:pointer;flex-shrink:0">
+        <input type="checkbox" id="d-qz-autolog" ${autoOn?'checked':''} onchange="qzSetAutoLog(this.checked)"/>
+        Auto-registrar no Diário
+      </label>
+    </div>
+  </div>
+  ${list.length===0 ? '<div class="empty" style="padding:20px 0">Nenhum exercício ainda. Adicione acima!</div>' : `
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div style="font-size:12px;font-weight:700;color:#555">📋 ${list.length} questão(ões) · ${doneCnt} respondida(s)</div>
+    ${doneCnt>0?`<button onclick="qzClearAnswers('${k}','${secId}',${n})" style="font-size:11px;padding:5px 12px;border:1px solid #e8e6e0;border-radius:8px;background:none;cursor:pointer;color:#888">Limpar respostas</button>`:''}
+  </div>
+  ${list.map((q,qi)=>renderQuizCard(q,qi,k,secId,n)).join('')}`}`;
+}
+
+function renderQuizCard(q,qi,k,secId,n){
+  const letters='ABCDE';
+  if(q.type==='tf'){
+    const ans=q.answered; const revealed=ans!==undefined;
+    const isCorrect=revealed&&ans===q.correct;
+    return `<div class="quiz-card" data-qid="${q.id}" data-k="${k}" data-sec="${secId}" data-n="${n}">
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <span style="font-size:11px;font-weight:800;color:#888;flex-shrink:0;padding-top:2px">Q${qi+1}</span>
+        <div class="quiz-statement">${escHtml(q.statement)}</div>
+        <button class="qz-del-btn" data-qid="${q.id}" onclick="qzDelCard(this)" style="margin-left:auto;background:none;border:none;cursor:pointer;color:#ccc;font-size:14px;flex-shrink:0">✕</button>
+      </div>
+      <div style="display:flex;gap:8px">
+        ${['C','E'].map(v=>{
+          let cls='quiz-opt';
+          if(revealed){ if(v===q.correct) cls+=' correct'; else if(v===ans&&!isCorrect) cls+=' wrong'; }
+          const canClick=!revealed;
+          return `<div class="${cls}" style="flex:1;gap:8px${canClick?';cursor:pointer':''}" ${canClick?'data-qz-tf="'+v+'"':''}>
+            <span style="width:24px;height:24px;border-radius:50%;background:${revealed&&v===q.correct?'#1D9E75':revealed&&v===ans&&!isCorrect?'#D9534F':'#185FA5'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0">${v}</span>
+            ${v==='C'?'Certo':'Errado'} ${revealed&&v===q.correct?' ✓':''} ${revealed&&v===ans&&!isCorrect?' ✗':''}
+          </div>`;
+        }).join('')}
+      </div>
+      ${revealed?`<div style="margin-top:8px;font-size:12px;font-weight:700;color:${isCorrect?'#1D9E75':'#D9534F'}">${isCorrect?'✅ Correto! Muito bem!':'❌ Errado. A resposta correta é '+(q.correct==='C'?'Certo':'Errado')+'.'}</div>`:''}
+    </div>`;
+  } else {
+    const ans=q.answered; const revealed=ans!==undefined;
+    return `<div class="quiz-card" data-qid="${q.id}" data-k="${k}" data-sec="${secId}" data-n="${n}">
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <span style="font-size:11px;font-weight:800;color:#888;flex-shrink:0;padding-top:2px">Q${qi+1}</span>
+        <div class="quiz-statement">${escHtml(q.statement)}</div>
+        <button class="qz-del-btn" data-qid="${q.id}" onclick="qzDelCard(this)" style="margin-left:auto;background:none;border:none;cursor:pointer;color:#ccc;font-size:14px;flex-shrink:0">✕</button>
+      </div>
+      ${q.options.map((opt,oi)=>{
+        let cls='quiz-opt';
+        if(revealed){ if(oi===q.correct) cls+=' correct'; else if(oi===ans&&ans!==q.correct) cls+=' wrong'; }
+        const canClick=!revealed;
+        return `<div class="${cls}" ${canClick?'data-qz-mc="'+oi+'"':''} style="${canClick?'cursor:pointer':''}">
+          <span class="quiz-letter">${letters[oi]}.</span>
+          <span>${escHtml(opt)}</span>
+          ${revealed&&oi===q.correct?' ✓':''}${revealed&&oi===ans&&ans!==q.correct?' ✗':''}
+        </div>`;
+      }).join('')}
+      ${revealed?`<div style="margin-top:6px;font-size:12px;font-weight:700;color:${ans===q.correct?'#1D9E75':'#D9534F'}">${ans===q.correct?'✅ Correto! Muito bem!':'❌ Errado. Resposta correta: '+letters[q.correct]+' — '+escHtml(q.options[q.correct])}</div>`:''}
+    </div>`;
+  }
+}
+
+// Delegate click events for quiz answers (avoids inline onclick escaping issues)
+document.addEventListener('click', function(e){
+  // Certo/Errado
+  const tfOpt=e.target.closest('[data-qz-tf]');
+  if(tfOpt){
+    const card=tfOpt.closest('.quiz-card');
+    if(!card) return;
+    qzAnswerTF(card.dataset.k,+card.dataset.qid,tfOpt.dataset.qzTf,card.dataset.sec,+card.dataset.n);
+    return;
+  }
+  // Múltipla escolha
+  const mcOpt=e.target.closest('[data-qz-mc]');
+  if(mcOpt){
+    const card=mcOpt.closest('.quiz-card');
+    if(!card) return;
+    qzAnswerMC(card.dataset.k,+card.dataset.qid,+mcOpt.dataset.qzMc,card.dataset.sec,+card.dataset.n);
+    return;
+  }
+});
+
+// Helper for the delete button inside a quiz card
+function qzDelCard(btn){
+  const card=btn.closest('.quiz-card');
+  if(!card) return;
+  deleteQuiz(card.dataset.k,+card.dataset.qid,card.dataset.sec,+card.dataset.n);
+}
+
+// ── Estado temporário do formulário de criação ──────────────────
+let _qzMcOpts=[{text:'',correct:true},{text:'',correct:false}];
+
+function qzToggleForm(){
+  const type=document.getElementById('d-qz-type')?.value;
+  const tfPanel=document.getElementById('d-qz-tf');
+  const mcPanel=document.getElementById('d-qz-mc');
+  if(tfPanel) tfPanel.style.display=type==='tf'?'block':'none';
+  if(mcPanel){ mcPanel.style.display=type==='mc'?'block':'none'; if(type==='mc') qzRenderOpts(); }
+}
+function qzRenderOpts(){
+  const el=document.getElementById('d-qz-opts'); if(!el) return;
+  const letters='ABCDE';
+  el.innerHTML=_qzMcOpts.slice(0,5).map((o,i)=>`
+    <div class="qz-mc-row">
+      <input type="radio" name="d-qz-mc-correct" value="${i}" ${o.correct?'checked':''} onchange="qzSetCorrect(${i})" style="flex-shrink:0"/>
+      <span class="quiz-letter">${letters[i]}.</span>
+      <input type="text" placeholder="Alternativa ${letters[i]}..." value="${escHtml(o.text)}" oninput="_qzMcOpts[${i}].text=this.value"/>
+      ${_qzMcOpts.length>2?`<button onclick="_qzMcOpts.splice(${i},1);qzRenderOpts()" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:14px;flex-shrink:0">✕</button>`:''}
+    </div>`).join('');
+}
+function qzSetCorrect(i){ _qzMcOpts.forEach((o,j)=>o.correct=j===i); }
+function qzAddOpt(){ if(_qzMcOpts.length<5) _qzMcOpts.push({text:'',correct:false}); qzRenderOpts(); }
+
+function addQuiz(k,secId,n){
+  const stmt=document.getElementById('d-qz-stmt')?.value.trim();
+  if(!stmt){ alert('Escreva o enunciado da questão.'); return; }
+  const type=document.getElementById('d-qz-type')?.value||'tf';
+  if(!state.quizzes) state.quizzes={};
+  if(!state.quizzes[k]) state.quizzes[k]=[];
+  if(type==='tf'){
+    const ans=[...document.querySelectorAll('[name="d-qz-tf-ans"]')].find(r=>r.checked)?.value||'C';
+    state.quizzes[k].push({id:Date.now(),type:'tf',statement:stmt,correct:ans,answered:undefined});
+  } else {
+    const opts=_qzMcOpts.map(o=>o.text.trim()).filter(Boolean);
+    if(opts.length<2){ alert('Adicione pelo menos 2 alternativas.'); return; }
+    const correctIdx=_qzMcOpts.findIndex(o=>o.correct);
+    const clampedCorrect=Math.min(correctIdx<0?0:correctIdx,opts.length-1);
+    state.quizzes[k].push({id:Date.now(),type:'mc',statement:stmt,options:opts,correct:clampedCorrect,answered:undefined});
+    _qzMcOpts=[{text:'',correct:true},{text:'',correct:false}];
+  }
+  document.getElementById('d-qz-stmt').value='';
+  save(); updateStats(); dRenderLesson(secId,n); setLessonTab('quiz',secId,n);
+}
+
+function qzAnswerTF(k,id,ans,secId,n){
+  const q=state.quizzes[k]?.find(q=>q.id===id); if(!q) return;
+  q.answered=ans;
+  qzAutoLogIfEnabled(k,secId,n);
+  save(); dRenderLesson(secId,n); setLessonTab('quiz',secId,n);
+}
+function qzAnswerMC(k,id,optIdx,secId,n){
+  const q=state.quizzes[k]?.find(q=>q.id===id); if(!q) return;
+  q.answered=optIdx;
+  qzAutoLogIfEnabled(k,secId,n);
+  save(); dRenderLesson(secId,n); setLessonTab('quiz',secId,n);
+}
+function deleteQuiz(k,id,secId,n){
+  if(!state.quizzes||!state.quizzes[k]) return;
+  state.quizzes[k]=state.quizzes[k].filter(q=>q.id!==id);
+  save(); updateStats(); dRenderLesson(secId,n); setLessonTab('quiz',secId,n);
+}
+function qzClearAnswers(k,secId,n){
+  (state.quizzes[k]||[]).forEach(q=>q.answered=undefined);
+  save(); dRenderLesson(secId,n); setLessonTab('quiz',secId,n);
+}
+function qzSetAutoLog(checked){
+  state.quizAutoLog=checked; save();
+}
+function qzAutoLogIfEnabled(k,secId,n){
+  if(!state.quizAutoLog) return;
+  const today=todayStr();
+  const sec=SECTIONS.find(s=>s.id===secId);
+  const secLabel=sec?'S'+sec.num+': '+sec.title:'';
+  const lesson=sec?.lessons.find(l=>l.n===n);
+  const lessonLabel=lesson?(state.customTitles[k]||lesson.t):'';
+  const totalAnswered=(state.quizzes[k]||[]).filter(q=>q.answered!==undefined).length;
+  const totalCorrect=(state.quizzes[k]||[]).filter(q=>{
+    if(q.type==='tf') return q.answered===q.correct;
+    return q.answered===q.correct;
+  }).length;
+  if(!state.activityDays) state.activityDays={};
+  state.activityDays[today]=true;
+  // Agrupamos todas as respostas de questões do mesmo dia/seção/aula em 1 registro
+  let entry=state.logs.find(l=>l.date===today&&l._quizKey===k);
+  const desc=`📋 Exercícios — ${totalAnswered} respondidas · ${totalCorrect} corretas · ${secLabel}${lessonLabel?' · '+lessonLabel:''}`;
+  if(entry){
+    entry.desc=desc;
+    entry.hours=Math.round((totalAnswered*0.05)*100)/100; // ~3min por questão
+  } else {
+    state.logs.unshift({id:Date.now(),date:today,hours:Math.round((totalAnswered*0.05)*100)/100,sec:secId,secs:[secId],desc,_quizKey:k});
+  }
+  updateStats(); renderLogList(); mRenderLog();
 }
 
 function editCode(k,id,secId,n){
@@ -3571,6 +3812,7 @@ function mRenderLesson(secId,n){
   const title=state.customTitles[k]||lesson.t;
   document.getElementById('m-aula-ttl').textContent=title;
   const notes=state.notes[k]||[]; const codes=state.codes[k]||[];
+  const quizzes=(state.quizzes&&state.quizzes[k])||[];
   const mlt=window._mLessonTab||'notas';
   const body=document.getElementById('m-aula-body');
   body.innerHTML=`
@@ -3595,6 +3837,7 @@ function mRenderLesson(secId,n){
       <div style="display:flex;gap:0;border-bottom:1px solid #e8e6e0;margin-bottom:12px">
         <button style="flex:1;padding:9px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid ${mlt==='notas'?'#185FA5':'transparent'};color:${mlt==='notas'?'#1a1a18':'#888'}" onclick="mSetLessonTab('notas','${secId}',${n})">📝 Notas (${notes.length})</button>
         <button style="flex:1;padding:9px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid ${mlt==='codigo'?'#534AB7':'transparent'};color:${mlt==='codigo'?'#1a1a18':'#888'}" onclick="mSetLessonTab('codigo','${secId}',${n})">💻 Código (${codes.length})</button>
+        <button style="flex:1;padding:9px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid ${mlt==='quiz'?'#f97316':'transparent'};color:${mlt==='quiz'?'#f97316':'#888'}" onclick="mSetLessonTab('quiz','${secId}',${n})">📋 Exerc. (${quizzes.length})</button>
       </div>
       <!-- NOTAS panel -->
       <div id="m-panel-notas" style="display:${mlt==='notas'?'block':'none'}">
@@ -3621,12 +3864,17 @@ function mRenderLesson(secId,n){
         <button onclick="mAddCode('${k}','${secId}',${n})" style="display:block;width:100%;padding:13px;border:none;border-radius:10px;background:#534AB7;color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:13px">+ Salvar código</button>
         <div id="m-codes-${k}">${renderCodesHTML(k,secId,n)}</div>
       </div>
+      <!-- QUIZ panel (mobile) -->
+      <div id="m-panel-quiz" style="display:${mlt==='quiz'?'block':'none'}">
+        ${renderQuizPanel(k,secId,n)}
+      </div>
     </div>`;
 }
 function mSetLessonTab(tab,secId,n){
   window._mLessonTab=tab;
   document.getElementById('m-panel-notas').style.display=tab==='notas'?'block':'none';
   document.getElementById('m-panel-codigo').style.display=tab==='codigo'?'block':'none';
+  const pq=document.getElementById('m-panel-quiz'); if(pq) pq.style.display=tab==='quiz'?'block':'none';
 }
 function mSetNoteType(btn){ curNoteType=btn.dataset.type; document.querySelectorAll('#m-nt-btns .ntb').forEach(b=>{b.className='ntb';if(b.dataset.type===curNoteType)b.classList.add('sel-'+curNoteType);}); }
 function mSetLang(btn){ curLang=btn.dataset.lang; document.querySelectorAll('#m-lang-btns .lang-btn').forEach(b=>{b.className='lang-btn';if(b.dataset.lang===curLang)b.classList.add('sel');}); }
@@ -4552,9 +4800,9 @@ async function cmSelectCourse(id){
     // Carregar estado do novo curso (se existir)
     const stored = await cloudGetItem('jt3_'+id);
     if(stored){
-      try{ const p=JSON.parse(stored); state=Object.assign({done:{},notes:{},codes:{},exercises:{},logs:[],customTitles:{},activeCourseId:id},p); }catch(e){}
+      try{ const p=JSON.parse(stored); state=Object.assign({done:{},notes:{},codes:{},exercises:{},quizzes:{},logs:[],customTitles:{},activeCourseId:id},p); }catch(e){}
     } else {
-      state={done:{},notes:{},codes:{},exercises:{},logs:[],customTitles:{},activeCourseId:id};
+      state={done:{},notes:{},codes:{},exercises:{},quizzes:{},logs:[],customTitles:{},activeCourseId:id};
     }
     state.activeCourseId=id;
     await setLastActiveCourseId(id);

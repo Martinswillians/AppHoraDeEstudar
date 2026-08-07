@@ -2025,12 +2025,49 @@ async function load(){
       if(p && typeof p === 'object'){
         state=Object.assign({done:{},notes:{},codes:{},exercises:{},quizzes:{},logs:[],customTitles:{},activeCourseId:state.activeCourseId||'java-completo'},p);
         migrateExercisesIntoNotes();
+        mergeLegacyQuizLogs();
         return;
       }
     }
   }catch(e){}
   // Nenhum dado na nuvem ainda para este curso: começa vazio
   state=Object.assign({done:{},notes:{},codes:{},exercises:{},quizzes:{},logs:[],customTitles:{}}, {activeCourseId: state.activeCourseId||'java-completo'});
+}
+
+// Limpeza: versões anteriores criavam 1 registro de exercícios por SEÇÃO/AULA (com
+// horas fictícias). Esta função funde, retroativamente, todos os registros de
+// exercícios de um mesmo dia num único registro (sem horas), extraindo os números
+// de "respondidas/corretas" que já estavam no texto salvo.
+function mergeLegacyQuizLogs(){
+  const isQuizLog = l => l && typeof l.desc === 'string' && l.desc.indexOf('📋') === 0;
+  const extractNum = (desc, re) => { const m = desc.match(re); return m ? parseInt(m[1]) : 0; };
+  const byDate = {};
+  state.logs.forEach(l => {
+    if (!isQuizLog(l)) return;
+    (byDate[l.date] = byDate[l.date] || []).push(l);
+  });
+  let changed = false;
+  Object.keys(byDate).forEach(date => {
+    const group = byDate[date];
+    let totalAnswered = 0, totalCorrect = 0;
+    const subjects = new Set();
+    group.forEach(l => {
+      totalAnswered += l.quizAnswered || extractNum(l.desc, /(\d+)\s*(?:questão|question|respondid)/i) || 0;
+      totalCorrect  += l.quizCorrect  || extractNum(l.desc, /(\d+)\s*corret/i) || 0;
+      (l.quizSubjects || []).forEach(s => subjects.add(s));
+      if (l.sec) { const s = SECTIONS.find(x => x.id === l.sec); if (s) subjects.add('S' + s.num + ': ' + s.title); }
+      if (group.length > 1 || l.hours || l._quizKey !== undefined || !l.autoQuiz) changed = true;
+    });
+    // Remove todos os registros antigos desse dia e recria um único, consolidado
+    const idsToRemove = new Set(group.map(l => l.id));
+    state.logs = state.logs.filter(l => !idsToRemove.has(l.id));
+    state.logs.push({
+      id: group[0].id, date, hours: 0, sec: '', secs: [], autoQuiz: true,
+      quizAnswered: totalAnswered, quizCorrect: totalCorrect, quizSubjects: [...subjects],
+      desc: `📋 ${totalAnswered} questão(ões) respondida(s) · ${totalCorrect} corretas` + (subjects.size ? ' · ' + [...subjects].join(', ') : ''),
+    });
+  });
+  if (changed) save();
 }
 
 // Migração: a aba "Exercícios" separada virou o tipo de anotação "Questão Respondida".

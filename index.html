@@ -1820,7 +1820,16 @@ let globalCodeFilter = 'all';
 function lk(secId, n){ return secId+'_'+n; }
 
 // ── STREAK ────────────────────────────────────────────────────
-function todayStr(){ return new Date().toISOString().split('T')[0]; }
+// Retorna a data no formato AAAA-MM-DD usando o horário LOCAL do dispositivo
+// (evita o bug clássico de "toISOString()" usar UTC e virar o dia errado à noite).
+function localDateStr(date){
+  const d = date || new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+day;
+}
+function todayStr(){ return localDateStr(); }
 
 function recordActivity(){
   const today = todayStr();
@@ -1836,7 +1845,7 @@ function calcStreak(){
   if(!days.length) return {current:0, longest:0, total:0, todayDone:false};
   const today = todayStr();
   const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  const yesterdayStr = localDateStr(yesterday);
   const todayDone = !!state.activityDays[today];
   // Current streak: count backwards from today or yesterday
   let current = 0;
@@ -1844,13 +1853,13 @@ function calcStreak(){
   while(state.activityDays[check]){
     current++;
     const d = new Date(check); d.setDate(d.getDate()-1);
-    check = d.toISOString().split('T')[0];
+    check = localDateStr(d);
   }
   // Longest streak
   let longest = 0, run = 1;
   for(let i=1;i<days.length;i++){
     const prev = new Date(days[i-1]); prev.setDate(prev.getDate()+1);
-    if(prev.toISOString().split('T')[0] === days[i]) run++;
+    if(localDateStr(prev) === days[i]) run++;
     else run = 1;
     if(run > longest) longest = run;
   }
@@ -4222,7 +4231,7 @@ function mInit(){
   mRenderLog();
   mUpdateProgList();
   updateStats();
-  const today=new Date().toISOString().split('T')[0];
+  const today=localDateStr();
   const md=document.getElementById('m-log-date'); if(md) md.value=today;
   // Show secoes
   document.querySelectorAll('.m-screen').forEach(s=>s.style.display='none');
@@ -5392,7 +5401,7 @@ function getLessonsPerDay(days=30){
   const today=new Date();
   for(let i=days-1;i>=0;i--){
     const d=new Date(today); d.setDate(d.getDate()-i);
-    const ds=d.toISOString().split('T')[0];
+    const ds=localDateStr(d);
     // Conta sessões de diário nesse dia
     const logSessions=state.logs.filter(l=>l.date===ds).length;
     // Atividade binária se não temos dados por aula
@@ -5409,7 +5418,7 @@ function getSessionsPerDay(days=7){
   const dayNames=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
   for(let i=days-1;i>=0;i--){
     const d=new Date(today); d.setDate(d.getDate()-i);
-    const ds=d.toISOString().split('T')[0];
+    const ds=localDateStr(d);
     const dayLogs=state.logs.filter(l=>l.date===ds);
     const hours=dayLogs.reduce((s,l)=>s+(parseFloat(l.hours)||0),0);
     const ddmm=String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');
@@ -5433,7 +5442,7 @@ function calcEstimation(){
 
   // Ritmo: aulas concluídas nas últimas 4 semanas / 4
   const fourWeeksAgo=new Date(); fourWeeksAgo.setDate(fourWeeksAgo.getDate()-28);
-  const fwStr=fourWeeksAgo.toISOString().split('T')[0];
+  const fwStr=localDateStr(fourWeeksAgo);
   // Conta dias com atividade nas últimas 4 semanas
   const activeDays=Object.keys(state.activityDays||{}).filter(d=>d>=fwStr && state.activityDays[d]).length;
 
@@ -5705,7 +5714,7 @@ function renderStreakModal(){
   let weekCount=0;
   for(let i=0;i<7;i++){
     const d=new Date(weekStart); d.setDate(weekStart.getDate()+i);
-    if(state.activityDays[d.toISOString().split('T')[0]]) weekCount++;
+    if(state.activityDays[localDateStr(d)]) weekCount++;
   }
   sv('streak-stat-week',weekCount);
   const heatmap=document.getElementById('streak-heatmap');
@@ -5713,7 +5722,7 @@ function renderStreakModal(){
     let html='';
     for(let i=29;i>=0;i--){
       const d=new Date(); d.setDate(d.getDate()-i);
-      const ds=d.toISOString().split('T')[0];
+      const ds=localDateStr(d);
       const active=!!state.activityDays[ds];
       const isToday=ds===todayStr();
       const label=d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
@@ -6146,7 +6155,7 @@ async function init(){
   // Migrar dias de atividade dos logs existentes (retroativo)
   if(!state.activityDays) state.activityDays={};
   state.logs.forEach(l=>{ if(l.date) state.activityDays[l.date]=true; });
-  const today=new Date().toISOString().split('T')[0];
+  const today=localDateStr();
   updateStats();
   updateStreakUI();
   const ldEl=document.getElementById('d-log-date'); if(ldEl) ldEl.value=today;

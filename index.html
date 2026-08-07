@@ -217,6 +217,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .multi-select-panel label{display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:12.5px;color:#333;cursor:pointer;border-radius:6px}
 .multi-select-panel label:hover{background:#f5f4f1}
 .multi-select-panel input{margin:0;flex-shrink:0}
+.log-type-toggle{display:flex;gap:6px;margin-bottom:12px}
+.log-type-btn{flex:1;padding:9px 8px;border:1.5px solid #e8e6e0;border-radius:9px;background:#faf9f7;color:#666;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.log-type-btn.active{background:#1a1a18;color:#fff;border-color:#1a1a18}
 .form-field.full{grid-column:1/-1}
 .form-field textarea{resize:vertical;min-height:65px;line-height:1.5}
 .btn-log{font-size:12px;font-weight:700;padding:8px 20px;background:#1a1a18;color:#fff;border:none;border-radius:8px;cursor:pointer}
@@ -1120,9 +1123,13 @@ body.focus-mode #focus-mode-btn{
           <input type="checkbox" id="d-auto-log-toggle" onchange="setAutoLogLessons(this.checked)"/>
           Auto-registrar aulas concluídas no Diário
         </label>
+        <div class="log-type-toggle">
+          <button type="button" class="log-type-btn active" id="d-log-type-aulas" onclick="setLogType('d','aulas')">📚 Aulas</button>
+          <button type="button" class="log-type-btn" id="d-log-type-exercicios" onclick="setLogType('d','exercicios')">📋 Exercícios (Questões)</button>
+        </div>
         <div class="form-grid">
           <div class="form-field"><label>Data</label><input type="date" id="d-log-date"/></div>
-          <div class="form-field"><label>Horas</label><input type="number" id="d-log-hours" min="0.5" max="12" step="0.5" placeholder="1.5" value="1"/></div>
+          <div class="form-field"><label id="d-log-hours-label">Horas</label><input type="number" id="d-log-hours" min="0.5" max="12" step="0.5" placeholder="1.5" value="1"/></div>
           <div class="form-field">
             <label>Seção</label>
             <div class="multi-select-wrap">
@@ -1198,9 +1205,13 @@ body.focus-mode #focus-mode-btn{
         <input type="checkbox" id="m-auto-log-toggle" onchange="setAutoLogLessons(this.checked)"/>
         Auto-registrar aulas concluídas no Diário
       </label>
+      <div class="log-type-toggle">
+        <button type="button" class="log-type-btn active" id="m-log-type-aulas" onclick="setLogType('m','aulas')">📚 Aulas</button>
+        <button type="button" class="log-type-btn" id="m-log-type-exercicios" onclick="setLogType('m','exercicios')">📋 Exercícios</button>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         <div class="form-field"><label>Data</label><input type="date" id="m-log-date"/></div>
-        <div class="form-field"><label>Horas</label><input type="number" id="m-log-hours" min="0.5" max="12" step="0.5" placeholder="1.5" value="1"/></div>
+        <div class="form-field"><label id="m-log-hours-label">Horas</label><input type="number" id="m-log-hours" min="0.5" max="12" step="0.5" placeholder="1.5" value="1"/></div>
       </div>
       <div class="form-field" style="margin-bottom:8px">
         <label>Seção</label>
@@ -2050,6 +2061,7 @@ async function load(){
 function mergeLegacyQuizLogs(){
   const isQuizLog = l => l && typeof l.desc === 'string' && l.desc.indexOf('📋') === 0;
   const extractNum = (desc, re) => { const m = desc.match(re); return m ? parseInt(m[1]) : 0; };
+  const shortSubj = s => { const m = String(s).match(/^S\d+/); return m ? m[0] : s; }; // "S27: Título longo" -> "S27"
   const byDate = {};
   state.logs.forEach(l => {
     if (!isQuizLog(l)) return;
@@ -2063,18 +2075,19 @@ function mergeLegacyQuizLogs(){
     group.forEach(l => {
       totalAnswered += l.quizAnswered || extractNum(l.desc, /(\d+)\s*(?:questão|question|respondid)/i) || 0;
       totalCorrect  += l.quizCorrect  || extractNum(l.desc, /(\d+)\s*corret/i) || 0;
-      (l.quizSubjects || []).forEach(s => subjects.add(s));
-      if (l.sec) { const s = SECTIONS.find(x => x.id === l.sec); if (s) subjects.add('S' + s.num + ': ' + s.title); }
+      (l.quizSubjects || []).forEach(s => subjects.add(shortSubj(s)));
+      if (l.sec) { const s = SECTIONS.find(x => x.id === l.sec); if (s) subjects.add('S' + s.num); }
       if (group.length > 1 || l.hours || l._quizKey !== undefined || !l.autoQuiz) changed = true;
     });
     // Remove todos os registros antigos desse dia e recria um único, consolidado
     const idsToRemove = new Set(group.map(l => l.id));
     state.logs = state.logs.filter(l => !idsToRemove.has(l.id));
-    state.logs.push({
+    const merged = {
       id: group[0].id, date, hours: 0, sec: '', secs: [], autoQuiz: true,
       quizAnswered: totalAnswered, quizCorrect: totalCorrect, quizSubjects: [...subjects],
-      desc: `📋 ${totalAnswered} questão(ões) respondida(s) · ${totalCorrect} corretas` + (subjects.size ? ' · ' + [...subjects].join(', ') : ''),
-    });
+    };
+    merged.desc = buildQuizLogDesc(merged);
+    state.logs.push(merged);
   });
   if (changed) save();
 }
@@ -2978,11 +2991,20 @@ function qzSetAutoLog(checked){
 // Agrupa TODAS as respostas de exercícios do dia (de qualquer seção/aula) num único
 // registro do Diário, somando quantas foram respondidas, quantas corretas, e listando
 // as matérias (seções) tocadas naquele dia — em vez de fingir um tempo estudado.
+// Monta a descrição resumida de um registro de exercícios: total respondido, total
+// correto (quando conhecido) e as seções/matérias envolvidas, em formato compacto (S27, S29).
+function buildQuizLogDesc(entry){
+  const subjLabel = (entry.quizSubjects||[]).join(', ');
+  let txt = `📋 ${entry.quizAnswered||0} questão(ões) respondida(s)`;
+  if(entry.quizCorrect) txt += ` · ${entry.quizCorrect} corretas`;
+  if(subjLabel) txt += ` · ${subjLabel}`;
+  return txt;
+}
 function qzAutoLogIfEnabled(secId,n,isCorrect){
   if(!state.quizAutoLog) return;
   const today=todayStr();
   const sec=SECTIONS.find(s=>s.id===secId);
-  const secLabel=sec?('S'+sec.num+': '+sec.title):'';
+  const secLabel=sec?('S'+sec.num):'';
   if(!state.activityDays) state.activityDays={};
   state.activityDays[today]=true;
   let entry=state.logs.find(l=>l.date===today&&l.autoQuiz);
@@ -2994,7 +3016,7 @@ function qzAutoLogIfEnabled(secId,n,isCorrect){
   entry.quizCorrect=(entry.quizCorrect||0)+(isCorrect?1:0);
   entry.quizSubjects=entry.quizSubjects||[];
   if(secLabel && !entry.quizSubjects.includes(secLabel)) entry.quizSubjects.push(secLabel);
-  entry.desc=`📋 ${entry.quizAnswered} questão(ões) respondida(s) · ${entry.quizCorrect} corretas`+(entry.quizSubjects.length?' · '+entry.quizSubjects.join(', '):'');
+  entry.desc=buildQuizLogDesc(entry);
   save(); updateStats(); renderLogList(); mRenderLog();
 }
 
@@ -3194,6 +3216,92 @@ function deleteGCode(k,id){
 // -- DIÁRIO ---------------------------------------------------
 // ── SELETOR MÚLTIPLO DE SEÇÃO (Diário) ──────────────────────────
 let _logSecSel = { d: [], m: [] }; // seções marcadas por formulário (desktop/mobile)
+let _logType = { d: 'aulas', m: 'aulas' }; // 'aulas' | 'exercicios'
+
+function setLogType(prefix, type){
+  _logType[prefix]=type;
+  const btnA=document.getElementById(prefix+'-log-type-aulas');
+  const btnE=document.getElementById(prefix+'-log-type-exercicios');
+  if(btnA) btnA.classList.toggle('active', type==='aulas');
+  if(btnE) btnE.classList.toggle('active', type==='exercicios');
+  const label=document.getElementById(prefix+'-log-hours-label');
+  const input=document.getElementById(prefix+'-log-hours');
+  if(type==='exercicios'){
+    if(label) label.textContent='Quantidade';
+    if(input){ input.placeholder='5'; input.step='1'; input.min='1'; input.value=input.value==='1'?'1':input.value; }
+  } else {
+    if(label) label.textContent='Horas';
+    if(input){ input.placeholder='1.5'; input.step='0.5'; input.min='0.5'; }
+  }
+}
+
+// Registro manual de exercícios: soma na mesma entrada consolidada do dia (a mesma
+// usada pelo auto-registro do quiz interativo), mantendo só 1 registro por dia.
+function addManualQuizEntry(date, qty, secIds, note){
+  if(!state.activityDays) state.activityDays={};
+  state.activityDays[date]=true;
+  let entry=state.logs.find(l=>l.date===date&&l.autoQuiz);
+  if(!entry){
+    entry={id:Date.now(),date,hours:0,sec:'',secs:[],desc:'',autoQuiz:true,quizAnswered:0,quizCorrect:0,quizSubjects:[]};
+    state.logs.unshift(entry);
+  }
+  entry.quizAnswered=(entry.quizAnswered||0)+qty;
+  entry.quizSubjects=entry.quizSubjects||[];
+  secIds.forEach(id=>{
+    const s=SECTIONS.find(x=>x.id===id);
+    if(s && !entry.quizSubjects.includes('S'+s.num)) entry.quizSubjects.push('S'+s.num);
+  });
+  entry.desc=buildQuizLogDesc(entry)+(note?' — '+note:'');
+  save(); updateStats(); renderLogList(); mRenderLog(); updateStreakUI();
+}
+
+function addLog(){
+  const dateEl=document.getElementById('d-log-date');
+  const hoursEl=document.getElementById('d-log-hours');
+  const date=dateEl?.value;
+  const hours=hoursEl?.value;
+  const secs=[..._logSecSel.d];
+  const desc=document.getElementById('d-log-desc')?.value.trim();
+  if(!date){ markLogFieldError(dateEl,'d-log-err','Informe a data da sessão.'); return; }
+  if(!hours){ markLogFieldError(hoursEl,'d-log-err',_logType.d==='exercicios'?'Informe a quantidade de questões respondidas.':'Informe as horas estudadas para registrar a sessão.'); return; }
+  if(_logType.d==='exercicios'){
+    const qty=parseInt(hours);
+    if(!qty||qty<1){ markLogFieldError(hoursEl,'d-log-err','Informe uma quantidade válida (mínimo 1).'); return; }
+    addManualQuizEntry(date,qty,secs,desc);
+  } else {
+    state.logs.unshift({id:Date.now(),date,hours:parseFloat(hours),sec:secs[0]||'',secs,desc});
+    if(!state.activityDays) state.activityDays={};
+    state.activityDays[date]=true;
+    save(); updateStats(); renderLogList(); updateStreakUI();
+    if(document.getElementById('activity-chart')) dRenderOverview();
+  }
+  document.getElementById('d-log-hours').value=_logType.d==='exercicios'?'':'1';
+  document.getElementById('d-log-desc').value='';
+  resetSecPicker('d');
+}
+function mAddLog(){
+  const dateEl=document.getElementById('m-log-date');
+  const hoursEl=document.getElementById('m-log-hours');
+  const date=dateEl?.value;
+  const hours=hoursEl?.value;
+  const secs=[..._logSecSel.m];
+  const desc=document.getElementById('m-log-desc')?.value.trim();
+  if(!date){ markLogFieldError(dateEl,'m-log-err','Informe a data da sessão.'); return; }
+  if(!hours){ markLogFieldError(hoursEl,'m-log-err',_logType.m==='exercicios'?'Informe a quantidade de questões respondidas.':'Informe as horas estudadas para registrar a sessão.'); return; }
+  if(_logType.m==='exercicios'){
+    const qty=parseInt(hours);
+    if(!qty||qty<1){ markLogFieldError(hoursEl,'m-log-err','Informe uma quantidade válida (mínimo 1).'); return; }
+    addManualQuizEntry(date,qty,secs,desc);
+  } else {
+    state.logs.unshift({id:Date.now(),date,hours:parseFloat(hours),sec:secs[0]||'',secs,desc});
+    if(!state.activityDays) state.activityDays={};
+    state.activityDays[date]=true;
+    save(); updateStats(); renderLogList(); mRenderLog(); updateStreakUI();
+  }
+  document.getElementById('m-log-hours').value=_logType.m==='exercicios'?'':'1';
+  document.getElementById('m-log-desc').value='';
+  resetSecPicker('m');
+}
 
 function populateLogSelects(){
   // Reseta a seleção quando a lista de seções do curso muda
@@ -3265,42 +3373,6 @@ function markLogFieldError(fieldEl,msgId,msgText){
   }
   if(msgEl){ msgEl.textContent=msgText; setTimeout(()=>{ msgEl.remove(); },3500); }
 }
-function addLog(){
-  const dateEl=document.getElementById('d-log-date');
-  const hoursEl=document.getElementById('d-log-hours');
-  const date=dateEl?.value;
-  const hours=hoursEl?.value;
-  const secs=[..._logSecSel.d];
-  const desc=document.getElementById('d-log-desc')?.value.trim();
-  if(!date){ markLogFieldError(dateEl,'d-log-err','Informe a data da sessão.'); return; }
-  if(!hours){ markLogFieldError(hoursEl,'d-log-err','Informe as horas estudadas para registrar a sessão.'); return; }
-  state.logs.unshift({id:Date.now(),date,hours:parseFloat(hours),sec:secs[0]||'',secs,desc});
-  // Registrar atividade no dia da sessão (pode ser retroativo)
-  if(!state.activityDays) state.activityDays={};
-  state.activityDays[date]=true;
-  document.getElementById('d-log-hours').value='1'; document.getElementById('d-log-desc').value='';
-  resetSecPicker('d');
-  save(); updateStats(); renderLogList(); updateStreakUI();
-  // Atualizar overview com novos dados (gráfico + metas)
-  if(document.getElementById('activity-chart')) dRenderOverview();
-}
-function mAddLog(){
-  const dateEl=document.getElementById('m-log-date');
-  const hoursEl=document.getElementById('m-log-hours');
-  const date=dateEl?.value;
-  const hours=hoursEl?.value;
-  const secs=[..._logSecSel.m];
-  const desc=document.getElementById('m-log-desc')?.value.trim();
-  if(!date){ markLogFieldError(dateEl,'m-log-err','Informe a data da sessão.'); return; }
-  if(!hours){ markLogFieldError(hoursEl,'m-log-err','Informe as horas estudadas para registrar a sessão.'); return; }
-  state.logs.unshift({id:Date.now(),date,hours:parseFloat(hours),sec:secs[0]||'',secs,desc});
-  // Registrar atividade no dia da sessão
-  if(!state.activityDays) state.activityDays={};
-  state.activityDays[date]=true;
-  document.getElementById('m-log-hours').value='1'; document.getElementById('m-log-desc').value='';
-  resetSecPicker('m');
-  save(); updateStats(); renderLogList(); mRenderLog(); updateStreakUI();
-}
 function formatHoursHM(hours){
   const h=parseFloat(hours)||0;
   const totalMin=Math.round(h*60);
@@ -3338,7 +3410,7 @@ function renderLogList(){
     const [y,m,d]=l.date.split('-');
     const titleTxt = l.autoQuiz ? '📋 Exercícios do dia' : logSectionLabel(l,sm);
     const valTxt = l.autoQuiz ? `${l.quizAnswered||0} questões` : `${formatHoursHM(l.hours)}h`;
-    const subLbl = l.autoQuiz ? `${l.quizCorrect||0} corretas` : 'estudadas';
+    const subLbl = l.autoQuiz ? ((l.quizAnswered||0)===1?'Resolvida':'Resolvidas') : 'estudadas';
     return `<div class="log-card">
       <div class="log-date-blk"><div class="log-day">${d}</div><div class="log-month">${months[parseInt(m)-1]}</div></div>
       <div class="log-sep"></div>
@@ -4198,6 +4270,7 @@ function mRenderLog(){
     const [y,m,d]=l.date.split('-');
     const titleTxt = l.autoQuiz ? '📋 Exercícios do dia' : logSectionLabel(l,sm);
     const valTxt = l.autoQuiz ? `${l.quizAnswered||0} questões` : `${formatHoursHM(l.hours)}h`;
+    const subLbl = l.autoQuiz ? ((l.quizAnswered||0)===1?'Resolvida':'Resolvidas') : 'estudadas';
     return `<div class="log-card" style="margin-bottom:8px">
       <div class="log-date-blk"><div class="log-day">${d}</div><div class="log-month">${months[parseInt(m)-1]}</div></div>
       <div class="log-sep"></div>
@@ -4205,7 +4278,7 @@ function mRenderLog(){
         <div class="log-title-txt">${titleTxt}</div>
         ${l.desc?`<div class="log-desc-txt">${l.desc}</div>`:''}
       </div>
-      <div style="text-align:right;flex-shrink:0"><div class="log-h">${valTxt}</div></div>
+      <div style="text-align:right;flex-shrink:0"><div class="log-h">${valTxt}</div><div class="log-hl">${subLbl}</div></div>
       <button class="del-btn" onclick="deleteLog(${l.id})" style="font-size:13px">✕</button>
     </div>`;
   }).join('');

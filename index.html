@@ -6738,135 +6738,142 @@ function closeDailyShare(){
 
 function getShareData(date){
   const dayLogs=state.logs.filter(l=>l.date===date);
-  const aulaLogs=dayLogs.filter(l=>!l.autoQuiz&&!l.hours===0);
+  const aulaLogs=dayLogs.filter(l=>!l.autoQuiz && (parseFloat(l.hours)||0)>0);
   const quizLog=dayLogs.find(l=>l.autoQuiz);
-  const totalHours=dayLogs.filter(l=>!l.autoQuiz).reduce((s,l)=>s+(parseFloat(l.hours)||0),0);
+  const totalHours=aulaLogs.reduce((s,l)=>s+(parseFloat(l.hours)||0),0);
   const totalQuestions=quizLog?(quizLog.quizAnswered||0):0;
   const totalCorrect=quizLog?(quizLog.quizCorrect||0):0;
-  // Disciplinas estudadas
   const sm={}; SECTIONS.forEach(s=>sm[s.id]=s);
-  const discSet=new Set();
-  dayLogs.filter(l=>!l.autoQuiz).forEach(l=>{
-    (l.secs||[l.sec]).filter(Boolean).forEach(id=>{ const s=sm[id]; if(s) discSet.add(s.title); });
+  // Aulas: por seção, pegar título e horas
+  const aulasMap={}; // secId -> {title, hours, lessons:[]}
+  aulaLogs.forEach(l=>{
+    (l.secs&&l.secs.length?l.secs:[l.sec]).filter(Boolean).forEach(id=>{
+      const s=sm[id]; if(!s) return;
+      if(!aulasMap[id]) aulasMap[id]={title:s.title,hours:0,desc:[]};
+      aulasMap[id].hours+=parseFloat(l.hours)||0;
+      if(l.desc) aulasMap[id].desc.push(l.desc);
+    });
+    // Se não tem seção mas tem horas, mostra como "Estudo geral"
+    if(!(l.secs&&l.secs.length) && !l.sec && (parseFloat(l.hours)||0)>0){
+      if(!aulasMap['_geral']) aulasMap['_geral']={title:'Estudo geral',hours:0,desc:[]};
+      aulasMap['_geral'].hours+=parseFloat(l.hours)||0;
+      if(l.desc) aulasMap['_geral'].desc.push(l.desc);
+    }
   });
+  const aulaItems=Object.values(aulasMap).sort((a,b)=>b.hours-a.hours);
+  // Disciplinas de exercícios
+  const quizSubjSet=new Set();
   (quizLog?.quizSubjects||[]).forEach(code=>{
     const s=SECTIONS.find(x=>'S'+x.num===code||x.id===code);
-    if(s) discSet.add(s.title);
+    quizSubjSet.add(s?s.title:code);
   });
-  const disciplines=[...discSet];
+  const allDiscSet=new Set([...aulaItems.map(a=>a.title),...quizSubjSet]);
   const userName=currentUser?.displayName||currentUser?.email?.split('@')[0]||'Estudante';
   const courseName=ACTIVE_COURSE?.name||'';
-  return {date,totalHours,totalQuestions,totalCorrect,disciplines,userName,courseName};
+  return {date,totalHours,totalQuestions,totalCorrect,aulaItems,quizSubjects:[...quizSubjSet],disciplines:[...allDiscSet],userName,courseName};
 }
 
 function drawShareCanvas(date){
   const canvas=document.getElementById('share-canvas'); if(!canvas) return;
   const D=getShareData(date);
-  const W=520, H=300;
-  canvas.width=W*2; canvas.height=H*2; // retina
+  const hasAulas=D.aulaItems.length>0, hasQuiz=D.totalQuestions>0;
+  // Altura dinâmica: cabeçalho + stats + aulas + exercícios + disciplinas + rodapé
+  const aulaRows=Math.min(D.aulaItems.length,5);
+  const quizRows=hasQuiz?1:0;
+  const discRows=Math.ceil(Math.min(D.disciplines.length,6)/3);
+  const W=520;
+  const H=82 + 82 + (hasAulas?(22+aulaRows*20+8):0) + (hasQuiz?(22+quizRows*20+8):0) + (D.disciplines.length>0?(22+discRows*16+14):0) + 30;
+  canvas.width=W*2; canvas.height=H*2;
   canvas.style.height=H+'px';
   const ctx=canvas.getContext('2d');
   ctx.scale(2,2);
 
-  // — Fundo degradê —
+  // Fundo degradê
   const grad=ctx.createLinearGradient(0,0,W,H);
   grad.addColorStop(0,'#0a1628'); grad.addColorStop(1,'#0d2a4a');
   ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
 
-  // — Faixa decorativa lateral —
+  // Faixa lateral
   const accent=ctx.createLinearGradient(0,0,0,H);
   accent.addColorStop(0,'#185FA5'); accent.addColorStop(1,'#1D9E75');
   ctx.fillStyle=accent; ctx.fillRect(0,0,6,H);
 
-  // — Topo: nome e data —
-  const [y,m,d]=date.split('-');
+  // Cabeçalho
+  const [yr,mo,dy]=date.split('-');
   const months=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  const dateLabel=`${parseInt(d)} de ${months[parseInt(m)-1]} de ${y}`;
-  ctx.fillStyle='rgba(255,255,255,0.12)';
-  ctx.fillRect(18,18,W-36,50);
-  ctx.fillStyle='#fff';
-  ctx.font='bold 15px system-ui,sans-serif';
-  ctx.fillText('🎓 Hora de Estudar', 30, 37);
-  ctx.font='12px system-ui,sans-serif';
-  ctx.fillStyle='#7ab3d4';
-  ctx.fillText(dateLabel, 30, 55);
-  ctx.font='bold 12px system-ui,sans-serif';
-  ctx.fillStyle='#b0c8e4';
+  const dateLabel=`${parseInt(dy)} de ${months[parseInt(mo)-1]} de ${yr}`;
+  ctx.fillStyle='rgba(255,255,255,0.10)'; ctx.fillRect(18,14,W-36,52);
+  ctx.fillStyle='#fff'; ctx.font='bold 14px system-ui,sans-serif';
+  ctx.fillText('🎓 Hora de Estudar', 28,33);
+  ctx.font='11px system-ui,sans-serif'; ctx.fillStyle='#7ab3d4';
+  ctx.fillText(dateLabel, 28,49);
   ctx.textAlign='right';
-  ctx.fillText(D.userName, W-22, 37);
-  if(D.courseName){
-    ctx.font='11px system-ui,sans-serif';
-    ctx.fillStyle='#7ab3d4';
-    const cn=D.courseName.length>38?D.courseName.slice(0,35)+'…':D.courseName;
-    ctx.fillText(cn, W-22, 55);
-  }
+  ctx.fillStyle='#fff'; ctx.font='bold 13px system-ui,sans-serif';
+  ctx.fillText(D.userName, W-20,33);
+  if(D.courseName){ ctx.font='10px system-ui,sans-serif'; ctx.fillStyle='#7ab3d4';
+    ctx.fillText(D.courseName.length>40?D.courseName.slice(0,38)+'…':D.courseName,W-20,49); }
   ctx.textAlign='left';
 
-  // — Cards de estatísticas —
+  // 4 cards de métricas
   const stats=[
-    {label:'Horas\nEstudadas', value:D.totalHours>0?formatHoursHM(D.totalHours)+'h':'0:00h', color:'#185FA5', bg:'rgba(24,95,165,.22)'},
-    {label:'Questões\nResolvidas', value:String(D.totalQuestions), color:'#1D9E75', bg:'rgba(29,158,117,.22)'},
+    {label:'Horas\nEstudadas', value:D.totalHours>0?formatHoursHM(D.totalHours)+'h':'—', color:'#185FA5', bg:'rgba(24,95,165,.22)'},
+    {label:'Questões\nResolvidas', value:String(D.totalQuestions||0), color:'#1D9E75', bg:'rgba(29,158,117,.22)'},
     {label:'Taxa de\nAcerto', value:D.totalQuestions>0?Math.round(D.totalCorrect/D.totalQuestions*100)+'%':'—', color:'#f97316', bg:'rgba(249,115,22,.22)'},
-    {label:'Disciplinas\nEstudadas', value:String(D.disciplines.length), color:'#a78bfa', bg:'rgba(167,139,250,.22)'},
+    {label:'Disciplinas', value:String(D.disciplines.length), color:'#a78bfa', bg:'rgba(167,139,250,.22)'},
   ];
-  const cw=(W-36)/4-6, ch=72, cy=86;
+  const cw=(W-44)/4, ch=64, cy=76;
   stats.forEach((s,i)=>{
-    const cx=18+i*(cw+8);
-    ctx.fillStyle=s.bg; roundRect(ctx,cx,cy,cw,ch,8); ctx.fill();
-    ctx.strokeStyle=s.color+'66'; ctx.lineWidth=1; roundRect(ctx,cx,cy,cw,ch,8); ctx.stroke();
-    ctx.fillStyle=s.color;
-    ctx.font='bold 22px system-ui,sans-serif'; ctx.textAlign='center';
-    ctx.fillText(s.value, cx+cw/2, cy+32);
-    ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='9px system-ui,sans-serif';
-    const lines=s.label.split('\n');
-    lines.forEach((ln,li)=>ctx.fillText(ln, cx+cw/2, cy+45+li*11));
+    const cx=18+i*(cw+5);
+    ctx.fillStyle=s.bg; roundRect(ctx,cx,cy,cw,ch,7); ctx.fill();
+    ctx.strokeStyle=s.color+'55'; ctx.lineWidth=1; roundRect(ctx,cx,cy,cw,ch,7); ctx.stroke();
+    ctx.fillStyle=s.color; ctx.font='bold 20px system-ui,sans-serif'; ctx.textAlign='center';
+    ctx.fillText(s.value,cx+cw/2,cy+28);
+    ctx.fillStyle='rgba(255,255,255,0.60)'; ctx.font='8.5px system-ui,sans-serif';
+    s.label.split('\n').forEach((ln,li)=>ctx.fillText(ln,cx+cw/2,cy+40+li*10));
   });
   ctx.textAlign='left';
+  let curY=cy+ch+14;
 
-  // — Barra de progresso (taxa de acerto) —
-  const pct=D.totalQuestions>0?D.totalCorrect/D.totalQuestions:0;
-  const bx=18, by=172, bw=W-36, bh=10;
-  ctx.fillStyle='rgba(255,255,255,.1)'; roundRect(ctx,bx,by,bw,bh,5); ctx.fill();
-  if(pct>0){
-    const pg=ctx.createLinearGradient(bx,0,bx+bw*pct,0);
-    pg.addColorStop(0,'#185FA5'); pg.addColorStop(1,'#1D9E75');
-    ctx.fillStyle=pg; roundRect(ctx,bx,by,Math.max(bw*pct,12),bh,5); ctx.fill();
-  }
-  ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='9px system-ui,sans-serif';
-  ctx.fillText('Taxa de acerto das questões', bx, by+24);
-  ctx.textAlign='right';
-  ctx.fillStyle='#1D9E75'; ctx.font='bold 10px system-ui,sans-serif';
-  ctx.fillText(D.totalQuestions>0?D.totalCorrect+' certas / '+D.totalQuestions+' total':'—', W-18, by+24);
-  ctx.textAlign='left';
-
-  // — Disciplinas —
-  if(D.disciplines.length>0){
-    ctx.fillStyle='rgba(255,255,255,0.08)'; roundRect(ctx,18,198,W-36,72,8); ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='9px system-ui,sans-serif';
-    ctx.fillText('📚 Disciplinas estudadas', 28, 214);
-    const maxPerLine=3, lineH=16, startY=228;
-    D.disciplines.slice(0,6).forEach((disc,i)=>{
-      const col=i%maxPerLine, row=Math.floor(i/maxPerLine);
-      const cellW=(W-56)/maxPerLine;
-      const x=28+col*cellW, y=startY+row*lineH;
-      ctx.fillStyle='#185FA5'; ctx.fillRect(x,y-8,3,10);
-      ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='10px system-ui,sans-serif';
-      const label=disc.length>28?disc.slice(0,26)+'…':disc;
-      ctx.fillText(label, x+8, y);
+  // Seção: AULAS
+  if(hasAulas){
+    ctx.fillStyle='rgba(24,95,165,0.18)'; roundRect(ctx,18,curY,W-36,18+aulaRows*20+6,8); ctx.fill();
+    ctx.fillStyle='#185FA5'; ctx.font='bold 10px system-ui,sans-serif';
+    ctx.fillText('📚 AULAS ESTUDADAS', 28, curY+13); curY+=22;
+    D.aulaItems.slice(0,5).forEach(a=>{
+      const hm=formatHoursHM(a.hours)+'h';
+      const title=a.title.length>50?a.title.slice(0,48)+'…':a.title;
+      ctx.fillStyle='rgba(255,255,255,0.80)'; ctx.font='10px system-ui,sans-serif';
+      ctx.fillText('•  '+title, 28, curY+11);
+      ctx.fillStyle='#7ab3d4'; ctx.font='bold 9.5px system-ui,sans-serif'; ctx.textAlign='right';
+      ctx.fillText(hm, W-24, curY+11); ctx.textAlign='left';
+      curY+=20;
     });
-    if(D.disciplines.length>6){
-      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.font='9px system-ui,sans-serif';
-      ctx.fillText(`+${D.disciplines.length-6} mais`, 28, startY+2*lineH);
-    }
+    curY+=8;
   }
 
-  // — Rodapé —
-  ctx.fillStyle='rgba(255,255,255,0.2)';
-  ctx.fillRect(0,H-26,W,1);
-  ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.font='10px system-ui,sans-serif';
-  ctx.fillText('🏆 Compartilhado via Hora de Estudar · martinswillians.github.io', 18, H-9);
-  ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,0.3)';
-  ctx.fillText('#GymRats #EstudosDiários', W-18, H-9);
+  // Seção: EXERCÍCIOS
+  if(hasQuiz){
+    const pct=Math.round(D.totalCorrect/D.totalQuestions*100);
+    ctx.fillStyle='rgba(29,158,117,0.18)'; roundRect(ctx,18,curY,W-36,42+6,8); ctx.fill();
+    ctx.fillStyle='#1D9E75'; ctx.font='bold 10px system-ui,sans-serif';
+    ctx.fillText('📋 QUESTÕES RESOLVIDAS', 28, curY+13); curY+=20;
+    ctx.fillStyle='rgba(255,255,255,0.80)'; ctx.font='10px system-ui,sans-serif';
+    ctx.fillText(`• ${D.totalQuestions} questões respondidas  —  ${D.totalCorrect} certas (${pct}% de acerto)`, 28, curY+11);
+    curY+=16;
+    if(D.quizSubjects.length>0){
+      const subjs=D.quizSubjects.slice(0,4).join(', ')+(D.quizSubjects.length>4?' +mais':'');
+      ctx.fillStyle='rgba(255,255,255,0.50)'; ctx.font='9px system-ui,sans-serif';
+      ctx.fillText('   Matérias: '+subjs, 28, curY+8); curY+=16;
+    }
+    curY+=6;
+  }
+
+  // Rodapé
+  ctx.fillStyle='rgba(255,255,255,0.15)'; ctx.fillRect(0,H-24,W,1);
+  ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.font='9.5px system-ui,sans-serif';
+  ctx.fillText('🏆 Hora de Estudar  ·  #GymRats #EstudosDiários', 18, H-8);
+  ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,0.25)';
+  ctx.fillText('martinswillians.github.io', W-18, H-8);
   ctx.textAlign='left';
 }
 
@@ -6902,27 +6909,35 @@ function copyShareText(){
   const D=getShareData(date);
   const [y,m,d]=date.split('-');
   const months=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  const hm=D.totalHours>0?formatHoursHM(D.totalHours)+'h':'0h';
+  const hm=D.totalHours>0?formatHoursHM(D.totalHours)+'h':'—';
   const pct=D.totalQuestions>0?Math.round(D.totalCorrect/D.totalQuestions*100):0;
-  let txt=`📊 *Estudos do dia — ${parseInt(d)} de ${months[parseInt(m)-1]}*\n\n`;
-  txt+=`👤 *${D.userName}*\n`;
-  if(D.courseName) txt+=`📘 ${D.courseName}\n`;
-  txt+=`\n⏱ *Horas estudadas:* ${hm}\n`;
+  let txt=`📊 *Estudos do dia — ${parseInt(d)} de ${months[parseInt(m)-1]} de ${y}*\n`;
+  txt+=`👤 *${D.userName}*`;
+  if(D.courseName) txt+=`  |  📘 ${D.courseName.length>50?D.courseName.slice(0,48)+'…':D.courseName}`;
+  txt+='\n\n';
+  if(D.totalHours>0){
+    txt+=`⏱ *Horas estudadas:* ${hm}\n`;
+    if(D.aulaItems.length>0){
+      D.aulaItems.forEach(a=>{
+        const h=formatHoursHM(a.hours)+'h';
+        txt+=`   • ${a.title.length>55?a.title.slice(0,53)+'…':a.title}  _(${h})_\n`;
+      });
+    }
+    txt+='\n';
+  }
   if(D.totalQuestions>0){
     txt+=`📋 *Questões resolvidas:* ${D.totalQuestions}\n`;
-    txt+=`✅ *Acertos:* ${D.totalCorrect} (${pct}%)\n`;
+    txt+=`✅ *Acertos:* ${D.totalCorrect} de ${D.totalQuestions} _(${pct}% de acerto)_\n`;
+    if(D.quizSubjects.length>0) txt+=`📌 *Matérias:* ${D.quizSubjects.join(', ')}\n`;
+    txt+='\n';
   }
-  if(D.disciplines.length>0){
-    txt+=`\n📚 *Disciplinas:*\n`;
-    D.disciplines.forEach(disc=>{ txt+=`• ${disc}\n`; });
-  }
-  txt+=`\n🏆 #GymRats #EstudosDiários #HoraDeEstudar`;
+  txt+=`🏆 #GymRats #EstudosDiários #HoraDeEstudar`;
   navigator.clipboard?.writeText(txt).then(()=>{
     const msg=document.getElementById('share-copy-msg');
     if(msg){ msg.textContent='✅ Texto copiado para a área de transferência!'; setTimeout(()=>msg.textContent='',3000); }
   }).catch(()=>{
     const msg=document.getElementById('share-copy-msg');
-    if(msg) msg.textContent='Copie o texto acima manualmente.';
+    if(msg) msg.textContent='Não foi possível copiar automaticamente.';
   });
 }
 

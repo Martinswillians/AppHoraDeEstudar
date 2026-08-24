@@ -6777,12 +6777,9 @@ function drawShareCanvas(date){
   const canvas=document.getElementById('share-canvas'); if(!canvas) return;
   const D=getShareData(date);
   const hasAulas=D.aulaItems.length>0, hasQuiz=D.totalQuestions>0;
-  // Altura dinâmica: cabeçalho + stats + aulas + exercícios + disciplinas + rodapé
   const aulaRows=Math.min(D.aulaItems.length,5);
-  const quizRows=hasQuiz?1:0;
-  const discRows=Math.ceil(Math.min(D.disciplines.length,6)/3);
   const W=520;
-  const H=82 + 82 + (hasAulas?(22+aulaRows*20+8):0) + (hasQuiz?(22+quizRows*20+8):0) + (D.disciplines.length>0?(22+discRows*16+14):0) + 30;
+  const H=82 + 82 + (hasAulas?(22+aulaRows*20+8):0) + (hasQuiz?(22+42+8):0) + 30;
   canvas.width=W*2; canvas.height=H*2;
   canvas.style.height=H+'px';
   const ctx=canvas.getContext('2d');
@@ -6814,14 +6811,18 @@ function drawShareCanvas(date){
     ctx.fillText(D.courseName.length>40?D.courseName.slice(0,38)+'…':D.courseName,W-20,49); }
   ctx.textAlign='left';
 
-  // 4 cards de métricas
-  const stats=[
-    {label:'Horas\nEstudadas', value:D.totalHours>0?formatHoursHM(D.totalHours)+'h':'—', color:'#185FA5', bg:'rgba(24,95,165,.22)'},
-    {label:'Questões\nResolvidas', value:String(D.totalQuestions||0), color:'#1D9E75', bg:'rgba(29,158,117,.22)'},
-    {label:'Taxa de\nAcerto', value:D.totalQuestions>0?Math.round(D.totalCorrect/D.totalQuestions*100)+'%':'—', color:'#f97316', bg:'rgba(249,115,22,.22)'},
-    {label:'Disciplinas', value:String(D.disciplines.length), color:'#a78bfa', bg:'rgba(167,139,250,.22)'},
+  // Cards de métricas — 4 com quiz, 2 sem quiz
+  const stats=hasQuiz?[
+    {label:'Horas\nEstudadas',    value:D.totalHours>0?formatHoursHM(D.totalHours)+'h':'—',          color:'#185FA5', bg:'rgba(24,95,165,.22)'},
+    {label:'Questões\nResolvidas', value:String(D.totalQuestions),                                      color:'#1D9E75', bg:'rgba(29,158,117,.22)'},
+    {label:'Taxa de\nAcerto',     value:Math.round(D.totalCorrect/D.totalQuestions*100)+'%',           color:'#f97316', bg:'rgba(249,115,22,.22)'},
+    {label:'Disciplinas',          value:String(D.disciplines.length),                                   color:'#a78bfa', bg:'rgba(167,139,250,.22)'},
+  ]:[
+    {label:'Horas\nEstudadas',    value:D.totalHours>0?formatHoursHM(D.totalHours)+'h':'—',          color:'#185FA5', bg:'rgba(24,95,165,.22)'},
+    {label:'Disciplinas\nEstudadas', value:String(D.disciplines.length),                               color:'#a78bfa', bg:'rgba(167,139,250,.22)'},
   ];
-  const cw=(W-44)/4, ch=64, cy=76;
+  const numCards=stats.length;
+  const cw=(W-18-numCards*5)/numCards, ch=64, cy=76;
   stats.forEach((s,i)=>{
     const cx=18+i*(cw+5);
     ctx.fillStyle=s.bg; roundRect(ctx,cx,cy,cw,ch,7); ctx.fill();
@@ -6834,15 +6835,15 @@ function drawShareCanvas(date){
   ctx.textAlign='left';
   let curY=cy+ch+14;
 
-  // Seção: AULAS
+  // Seção AULAS
   if(hasAulas){
     ctx.fillStyle='rgba(24,95,165,0.18)'; roundRect(ctx,18,curY,W-36,18+aulaRows*20+6,8); ctx.fill();
-    ctx.fillStyle='#185FA5'; ctx.font='bold 10px system-ui,sans-serif';
+    ctx.fillStyle='#4da3e8'; ctx.font='bold 10px system-ui,sans-serif';
     ctx.fillText('📚 AULAS ESTUDADAS', 28, curY+13); curY+=22;
     D.aulaItems.slice(0,5).forEach(a=>{
       const hm=formatHoursHM(a.hours)+'h';
-      const title=a.title.length>50?a.title.slice(0,48)+'…':a.title;
-      ctx.fillStyle='rgba(255,255,255,0.80)'; ctx.font='10px system-ui,sans-serif';
+      const title=a.title.length>52?a.title.slice(0,50)+'…':a.title;
+      ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='10px system-ui,sans-serif';
       ctx.fillText('•  '+title, 28, curY+11);
       ctx.fillStyle='#7ab3d4'; ctx.font='bold 9.5px system-ui,sans-serif'; ctx.textAlign='right';
       ctx.fillText(hm, W-24, curY+11); ctx.textAlign='left';
@@ -6851,14 +6852,14 @@ function drawShareCanvas(date){
     curY+=8;
   }
 
-  // Seção: EXERCÍCIOS
+  // Seção QUESTÕES — só quando houver questões respondidas
   if(hasQuiz){
     const pct=Math.round(D.totalCorrect/D.totalQuestions*100);
     ctx.fillStyle='rgba(29,158,117,0.18)'; roundRect(ctx,18,curY,W-36,42+6,8); ctx.fill();
     ctx.fillStyle='#1D9E75'; ctx.font='bold 10px system-ui,sans-serif';
     ctx.fillText('📋 QUESTÕES RESOLVIDAS', 28, curY+13); curY+=20;
-    ctx.fillStyle='rgba(255,255,255,0.80)'; ctx.font='10px system-ui,sans-serif';
-    ctx.fillText(`• ${D.totalQuestions} questões respondidas  —  ${D.totalCorrect} certas (${pct}% de acerto)`, 28, curY+11);
+    ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='10px system-ui,sans-serif';
+    ctx.fillText(`• ${D.totalQuestions} questões  —  ${D.totalCorrect} certas (${pct}% de acerto)`, 28, curY+11);
     curY+=16;
     if(D.quizSubjects.length>0){
       const subjs=D.quizSubjects.slice(0,4).join(', ')+(D.quizSubjects.length>4?' +mais':'');
@@ -6897,10 +6898,24 @@ function downloadShareCard(){
   const canvas=document.getElementById('share-canvas'); if(!canvas) return;
   const picker=document.getElementById('share-date-picker');
   const date=(picker?.value||todayStr()).replace(/-/g,'');
-  const a=document.createElement('a');
-  a.href=canvas.toDataURL('image/png');
-  a.download=`estudos-${date}.png`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  const filename=`estudos-${date}.png`;
+  canvas.toBlob(async blob=>{
+    if(!blob) return;
+    // iOS Safari / Android Chrome: usa Web Share API para "Salvar imagem" nativo
+    if(navigator.share && navigator.canShare && navigator.canShare({files:[new File([blob],filename,{type:'image/png'})]})){
+      try{
+        await navigator.share({files:[new File([blob],filename,{type:'image/png'})], title:'Meus estudos do dia'});
+        return;
+      }catch(e){ /* usuário cancelou ou share falhou — cai no fallback abaixo */ }
+    }
+    // Fallback: URL de objeto (funciona no desktop e Android)
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  },'image/png');
 }
 
 function copyShareText(){

@@ -232,7 +232,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .log-title-txt{font-size:13px;font-weight:600;color:#1a1a18}
 .log-desc-txt{font-size:12px;color:#888;margin-top:2px;line-height:1.5}
 .log-h{font-size:20px;font-weight:800;color:#185FA5}
-.log-list-label{font-size:12px;font-weight:800;color:#666;text-transform:uppercase;letter-spacing:.4px;margin:20px 2px 10px;display:flex;align-items:center;gap:6px}
+.log-list-label{font-size:12px;font-weight:800;color:#666;text-transform:uppercase;letter-spacing:.4px;margin:20px 2px 10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;row-gap:8px}
+.log-list-label .llbl-txt{display:flex;align-items:center;gap:6px}
+.share-btn{margin-left:auto;font-size:11px;font-weight:700;text-transform:none;letter-spacing:0;padding:8px 13px;border-radius:8px;border:1px solid #c8ddf2;background:#f0f7ff;color:#185FA5;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.share-btn:hover{background:#e2f0ff}
+@media (max-width:480px){.share-btn{width:100%;justify-content:center;margin-left:0}}
+.share-modal{background:#0f1420;border-radius:16px;width:100%;max-width:420px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.share-modal .modal-hdr{background:#fff;border-bottom:1px solid #f0eeea}
+.share-modal-body{padding:16px;overflow-y:auto;background:#fff}
+.share-modal-body .form-field{margin-bottom:12px}
+.share-modal-body .form-field label{font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.4px}
+.share-modal-body .form-field input[type=date]{font-size:13px;padding:9px 11px;border:1px solid #e8e6e0;border-radius:8px;font-family:inherit;outline:none}
+.share-card-wrap{border-radius:14px;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,.28);position:relative;line-height:0}
+.share-card-canvas{width:100%;height:auto;display:block}
+.share-empty-msg{font-size:12px;color:#D9534F;text-align:center;margin-top:10px;font-weight:600;display:none}
+.share-actions{display:flex;gap:8px;margin-top:14px}
+.btn-share{flex:1;font-size:13px;font-weight:700;padding:12px 8px;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s}
+.btn-share-dl{background:#1a1a18;color:#fff}
+.btn-share-copy{background:#185FA5;color:#fff}
+.btn-share.copied{background:#1D9E75!important}
+.btn-share:disabled{opacity:.5;cursor:not-allowed}
 .log-hl{font-size:9px;color:#aaa}
 /* ── OVERVIEW ── */
 .ov-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
@@ -1144,7 +1163,10 @@ body.focus-mode #focus-mode-btn{
         </div>
         <button class="btn-log" onclick="addLog()">Registrar ↗</button>
       </div>
-      <div class="log-list-label">🗂 Lista de Registros de Estudo</div>
+      <div class="log-list-label">
+        <span class="llbl-txt">🗂 Lista de Registros de Estudo</span>
+        <button type="button" class="share-btn" onclick="openShareModal()">📊 Compartilhar meus estudos</button>
+      </div>
       <div id="d-log-list"></div>
     </div>
     <div id="ctab-cursos" class="ctab"><div id="d-cursos-panel" style="max-width:760px;margin:0 auto;padding-bottom:32px"></div></div>
@@ -1227,7 +1249,10 @@ body.focus-mode #focus-mode-btn{
       <div class="form-field" style="margin-bottom:10px"><label>Anotação</label><textarea id="m-log-desc" style="min-height:65px;resize:none;line-height:1.5" placeholder="O que você estudou?"></textarea></div>
       <button class="btn-log" style="width:100%;padding:11px" onclick="mAddLog()">Registrar ↗</button>
     </div>
-    <div class="log-list-label" style="margin:0 0 8px">🗂 Lista de Registros de Estudo</div>
+    <div class="log-list-label" style="margin:0 0 8px">
+      <span class="llbl-txt">🗂 Lista de Registros de Estudo</span>
+      <button type="button" class="share-btn" onclick="openShareModal()">📊 Compartilhar meus estudos</button>
+    </div>
     <div id="m-log-list"></div>
   </div>
   <div id="ms-cursos" class="m-screen" style="height:100%;overflow-y:auto;padding:12px;display:none">
@@ -6935,6 +6960,30 @@ authGate();
   </div>
 </div>
 
+<!-- ═══ COMPARTILHAR MEUS ESTUDOS (card estilo GranCursos) ═══ -->
+<div class="modal-overlay" id="share-modal" onclick="if(event.target===this)closeShareModal()">
+  <div class="share-modal">
+    <div class="modal-hdr">
+      <div><h2>📊 Compartilhar meus estudos</h2><p style="font-size:11px;color:#888;margin-top:2px">Gere um card para postar no GymRats ou compartilhar</p></div>
+      <button class="modal-close" onclick="closeShareModal()">✕</button>
+    </div>
+    <div class="share-modal-body">
+      <div class="form-field">
+        <label>Data</label>
+        <input type="date" id="share-date" onchange="renderShareCard()"/>
+      </div>
+      <div class="share-card-wrap">
+        <canvas id="share-card-canvas" class="share-card-canvas"></canvas>
+      </div>
+      <div class="share-empty-msg" id="share-empty-msg">Nenhum estudo registrado nesse dia — o card ainda pode ser baixado, mas ficará vazio.</div>
+      <div class="share-actions">
+        <button type="button" class="btn-share btn-share-dl" id="btn-share-dl" onclick="downloadShareCard()">💾 Baixar imagem</button>
+        <button type="button" class="btn-share btn-share-copy" id="btn-share-copy" onclick="copyShareText()">📋 Copiar texto</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ DELETE CONFIRM MODAL ═══ -->
 <div class="del-modal-overlay" id="del-confirm-overlay" onclick="if(event.target===this)closDelModal()">
   <div class="del-modal" id="del-confirm-modal">
@@ -7028,5 +7077,338 @@ authGate();
       </div>
     </div>
   </div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// COMPARTILHAR MEUS ESTUDOS — card visual estilo GranCursos
+// ══════════════════════════════════════════════════════════════
+
+// Agrega os registros do Diário (aulas + exercícios) de UMA data específica
+// num resumo pronto para desenhar no card / gerar o texto de compartilhamento.
+function getDayStudySummary(date){
+  const dayLogs = (state.logs||[]).filter(l=>l.date===date);
+  const sm={}; (SECTIONS||[]).forEach(s=>sm[s.id]=s);
+  // Mapa "S{num}" -> seção, para casar os códigos curtos usados nos registros
+  // automáticos de exercícios (l.quizSubjects) com as seções completas.
+  const byShortCode={}; (SECTIONS||[]).forEach(s=>{ byShortCode['S'+s.num]=s; });
+  let totalHours=0, quizAnswered=0, quizCorrect=0;
+  // Chave única por seção (ou rótulo livre) -> rótulo de exibição, evita duplicar
+  // a mesma disciplina quando ela aparece tanto num registro de aula quanto de exercício.
+  const subjectsMap=new Map();
+  const addSubject=(key,label)=>{ if(!subjectsMap.has(key)) subjectsMap.set(key,label); };
+  dayLogs.forEach(l=>{
+    if(l.autoQuiz){
+      quizAnswered += l.quizAnswered||0;
+      quizCorrect  += l.quizCorrect||0;
+      (l.quizSubjects||[]).forEach(code=>{
+        const s=byShortCode[code];
+        addSubject(s?s.id:code, s?('S'+s.num+': '+s.title):code);
+      });
+    } else {
+      totalHours += parseFloat(l.hours)||0;
+      if(l.secs && l.secs.length){
+        l.secs.forEach(id=>{ const s=sm[id]; addSubject(id, s?('S'+s.num+': '+s.title):'Estudo geral'); });
+      } else if(l.sec && sm[l.sec]){
+        const s=sm[l.sec]; addSubject(l.sec, 'S'+s.num+': '+s.title);
+      } else {
+        addSubject('__geral__','Estudo geral');
+      }
+    }
+  });
+  const hasQuestions = quizAnswered>0;
+  return {
+    date,
+    hasAnyLog: dayLogs.length>0,
+    totalHours,
+    quizAnswered,
+    quizCorrect,
+    hasQuestions,
+    accuracyPct: hasQuestions ? Math.round((quizCorrect/quizAnswered)*100) : null,
+    subjects: [...subjectsMap.values()]
+  };
+}
+
+function _shareFormatDate(dateStr){
+  const [y,m,d]=dateStr.split('-').map(Number);
+  const dt=new Date(y,m-1,d);
+  let txt=dt.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  return txt.charAt(0).toUpperCase()+txt.slice(1);
+}
+function _shareFormatHours(h){
+  const totalMin=Math.round((parseFloat(h)||0)*60);
+  const hh=Math.floor(totalMin/60), mm=totalMin%60;
+  if(hh===0) return mm+'m';
+  if(mm===0) return hh+'h';
+  return hh+'h '+mm+'m';
+}
+function _shareUserName(){
+  return (typeof currentUser!=='undefined' && currentUser && currentUser.displayName) ? currentUser.displayName : 'Meus estudos';
+}
+function _shareCourseName(){
+  return (typeof ACTIVE_COURSE!=='undefined' && ACTIVE_COURSE && ACTIVE_COURSE.name) ? ACTIVE_COURSE.name : '';
+}
+
+function _shareRoundRect(ctx,x,y,w,h,r){
+  if(typeof r==='number') r={tl:r,tr:r,br:r,bl:r};
+  ctx.beginPath();
+  ctx.moveTo(x+r.tl,y);
+  ctx.lineTo(x+w-r.tr,y);
+  ctx.arcTo(x+w,y,x+w,y+r.tr,r.tr);
+  ctx.lineTo(x+w,y+h-r.br);
+  ctx.arcTo(x+w,y+h,x+w-r.br,y+h,r.br);
+  ctx.lineTo(x+r.bl,y+h);
+  ctx.arcTo(x,y+h,x,y+h-r.bl,r.bl);
+  ctx.lineTo(x,y+r.tl);
+  ctx.arcTo(x,y,x+r.tl,y,r.tl);
+  ctx.closePath();
+}
+// Quebra texto em várias linhas respeitando maxWidth; devolve o Y final.
+function _shareWrapText(ctx,text,x,y,maxWidth,lineHeight,maxLines){
+  const words=String(text).split(' ');
+  let line='', linesDrawn=0;
+  for(let i=0;i<words.length;i++){
+    const test=line?(line+' '+words[i]):words[i];
+    if(ctx.measureText(test).width>maxWidth && line){
+      ctx.fillText(line,x,y);
+      line=words[i]; y+=lineHeight; linesDrawn++;
+      if(maxLines && linesDrawn>=maxLines-1){
+        // última linha permitida: trunca com reticências se ainda sobrar texto
+        const rest=words.slice(i).join(' ');
+        let last=rest;
+        while(ctx.measureText(last+'…').width>maxWidth && last.length>1){ last=last.slice(0,-1); }
+        ctx.fillText(rest===last?last:last+'…',x,y);
+        return y+lineHeight;
+      }
+    } else { line=test; }
+  }
+  if(line) ctx.fillText(line,x,y);
+  return y+lineHeight;
+}
+
+// Desenha o card completo num canvas já dimensionado (W x H em "pixels de design").
+// `scale` multiplica tudo para exportação em alta resolução (retina 2x).
+function drawShareCard(canvas, W, H, scale, data){
+  canvas.width=W*scale; canvas.height=H*scale;
+  const ctx=canvas.getContext('2d');
+  ctx.setTransform(scale,0,0,scale,0,0);
+  ctx.clearRect(0,0,W,H);
+
+  // Fundo: gradiente escuro/azul estilo GranCursos
+  const bg=ctx.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#0a1128');
+  bg.addColorStop(.55,'#0f2a5c');
+  bg.addColorStop(1,'#144d9c');
+  ctx.fillStyle=bg;
+  ctx.fillRect(0,0,W,H);
+  // Glow decorativo
+  const glow=ctx.createRadialGradient(W*0.85,H*0.06,10,W*0.85,H*0.06,W*0.55);
+  glow.addColorStop(0,'rgba(90,160,255,.35)');
+  glow.addColorStop(1,'rgba(90,160,255,0)');
+  ctx.fillStyle=glow; ctx.fillRect(0,0,W,H);
+
+  const M=34; // margem lateral
+  let y=44;
+
+  // Selo do app
+  ctx.fillStyle='rgba(255,255,255,.12)';
+  _shareRoundRect(ctx,M,y-24,150,30,15); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.font='700 13px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+  ctx.textBaseline='middle';
+  ctx.fillText('🎓 Hora de Estudar',M+13,y-9);
+  ctx.textBaseline='alphabetic';
+
+  y+=42;
+  // Nome do usuário
+  ctx.fillStyle='#fff';
+  ctx.font='800 26px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+  ctx.fillText(_shareUserName(),M,y);
+  y+=27;
+  // Curso
+  const course=_shareCourseName();
+  if(course){
+    ctx.fillStyle='#8fc1ff';
+    ctx.font='700 14px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+    ctx.fillText(course,M,y);
+    y+=18;
+  }
+  // Data
+  ctx.fillStyle='rgba(255,255,255,.6)';
+  ctx.font='600 12px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+  ctx.fillText(_shareFormatDate(data.date),M,y+16);
+
+  y+=48;
+
+  // ── Grade 2x2 de blocos coloridos ──
+  const gap=12;
+  const blockW=(W-2*M-gap)/2;
+  const blockH=92;
+  const blocks=[
+    {icon:'⏱️',value:_shareFormatHours(data.totalHours),label:'Horas Estudadas',color:'#F59E0B',disabled:false},
+    {icon:'📋',value:String(data.quizAnswered||0),label:'Questões Resolvidas',color:'#8B5CF6',disabled:false},
+    {icon:'🎯',value:data.hasQuestions?data.accuracyPct+'%':'—',label:'Taxa de Acerto',color:'#10B981',disabled:!data.hasQuestions},
+    {icon:'📚',value:String(data.subjects.length||0),label:'Disciplinas Estudadas',color:'#EC4899',disabled:false},
+  ];
+  blocks.forEach((b,i)=>{
+    const col=i%2, row=Math.floor(i/2);
+    const bx=M+col*(blockW+gap), by=y+row*(blockH+gap);
+    ctx.fillStyle=b.disabled?'rgba(255,255,255,.05)':_shareHex2rgba(b.color,.16);
+    _shareRoundRect(ctx,bx,by,blockW,blockH,14); ctx.fill();
+    ctx.strokeStyle=b.disabled?'rgba(255,255,255,.08)':_shareHex2rgba(b.color,.4);
+    ctx.lineWidth=1.5; ctx.stroke();
+    ctx.font='20px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+    ctx.fillStyle=b.disabled?'rgba(255,255,255,.35)':'#fff';
+    ctx.fillText(b.icon,bx+16,by+34);
+    ctx.font='800 22px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+    ctx.fillStyle=b.disabled?'rgba(255,255,255,.35)':'#fff';
+    ctx.fillText(b.value,bx+16,by+62);
+    ctx.font='700 11px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+    ctx.fillStyle=b.disabled?'rgba(255,255,255,.3)':'rgba(255,255,255,.75)';
+    ctx.fillText(b.label.toUpperCase(),bx+16,by+79);
+  });
+  y+=2*blockH+gap+30;
+
+  // ── Barra de progresso da taxa de acerto ──
+  ctx.font='700 11px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+  ctx.fillStyle='rgba(255,255,255,.7)';
+  ctx.fillText('TAXA DE ACERTO', M, y);
+  const barY=y+10, barH=10, barW=W-2*M;
+  ctx.fillStyle='rgba(255,255,255,.1)';
+  _shareRoundRect(ctx,M,barY,barW,barH,barH/2); ctx.fill();
+  if(data.hasQuestions){
+    const pct=Math.max(0,Math.min(100,data.accuracyPct))/100;
+    const fillW=Math.max(barH,barW*pct);
+    const barGrad=ctx.createLinearGradient(M,0,M+barW,0);
+    barGrad.addColorStop(0,'#10B981'); barGrad.addColorStop(1,'#34D399');
+    ctx.fillStyle=barGrad;
+    _shareRoundRect(ctx,M,barY,fillW,barH,barH/2); ctx.fill();
+  } else {
+    ctx.font='600 11px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+    ctx.fillStyle='rgba(255,255,255,.4)';
+    ctx.fillText('Sem questões respondidas neste dia', M, barY+barH+16);
+  }
+  y=barY+barH+ (data.hasQuestions?26:32);
+
+  // ── Lista de disciplinas estudadas ──
+  ctx.font='700 11px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+  ctx.fillStyle='rgba(255,255,255,.7)';
+  ctx.fillText('DISCIPLINAS ESTUDADAS', M, y);
+  y+=20;
+  ctx.font='600 13px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+  ctx.fillStyle='#fff';
+  if(data.subjects.length){
+    const MAX_SHOW=5;
+    const shown=data.subjects.slice(0,MAX_SHOW);
+    shown.forEach(s=>{
+      ctx.fillStyle='rgba(255,255,255,.9)';
+      ctx.fillText('•  '+s, M, y);
+      y+=20;
+    });
+    if(data.subjects.length>MAX_SHOW){
+      ctx.fillStyle='rgba(255,255,255,.55)';
+      ctx.fillText('+ '+(data.subjects.length-MAX_SHOW)+' outra(s)', M, y);
+      y+=20;
+    }
+  } else {
+    ctx.fillStyle='rgba(255,255,255,.5)';
+    ctx.fillText('Nenhum estudo registrado neste dia', M, y);
+    y+=20;
+  }
+
+  // ── Rodapé com hashtags ──
+  ctx.font='700 13px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+  ctx.fillStyle='#8fc1ff';
+  ctx.textAlign='center';
+  ctx.fillText('#GymRats   #EstudosDiários', W/2, H-26);
+  ctx.textAlign='left';
+}
+function _shareHex2rgba(hex,alpha){
+  const h=hex.replace('#','');
+  const r=parseInt(h.substring(0,2),16), g=parseInt(h.substring(2,4),16), b=parseInt(h.substring(4,6),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// Tamanho de design do card (proporção 4:5, boa para feed/GymRats)
+const SHARE_CARD_W=640, SHARE_CARD_H=780;
+let _shareCurrentData=null;
+
+function openShareModal(){
+  const dateEl=document.getElementById('share-date');
+  if(dateEl) dateEl.value = todayStr();
+  document.getElementById('share-modal').classList.add('open');
+  renderShareCard();
+}
+function closeShareModal(){
+  const m=document.getElementById('share-modal'); if(m) m.classList.remove('open');
+}
+function renderShareCard(){
+  const dateEl=document.getElementById('share-date');
+  const date=dateEl?.value || todayStr();
+  const data=getDayStudySummary(date);
+  _shareCurrentData=data;
+  const canvas=document.getElementById('share-card-canvas');
+  if(canvas) drawShareCard(canvas, SHARE_CARD_W, SHARE_CARD_H, 1, data);
+  const emptyMsg=document.getElementById('share-empty-msg');
+  if(emptyMsg) emptyMsg.style.display = data.hasAnyLog ? 'none' : 'block';
+}
+
+// 💾 Baixar imagem — PNG em alta resolução (retina 2x), funciona em desktop e mobile
+function downloadShareCard(){
+  if(!_shareCurrentData) return;
+  const btn=document.getElementById('btn-share-dl');
+  const offCanvas=document.createElement('canvas');
+  drawShareCard(offCanvas, SHARE_CARD_W, SHARE_CARD_H, 2, _shareCurrentData);
+  offCanvas.toBlob(blob=>{
+    if(!blob){ if(btn){btn.textContent='❌ Erro ao gerar';setTimeout(()=>{btn.textContent='💾 Baixar imagem';},2000);} return; }
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download='hora-de-estudar_'+_shareCurrentData.date+'.png';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+    if(btn){ const orig=btn.innerHTML; btn.innerHTML='✅ Baixado!'; btn.classList.add('copied'); setTimeout(()=>{btn.innerHTML=orig;btn.classList.remove('copied');},2000); }
+  },'image/png',1);
+}
+
+// Monta o texto formatado (Markdown/WhatsApp) do resumo do dia
+function buildShareText(data){
+  let txt=`🎓 *${_shareUserName()}* — Resumo de estudos\n`;
+  const course=_shareCourseName();
+  if(course) txt+=`📘 ${course}\n`;
+  txt+=`📅 ${_shareFormatDate(data.date)}\n\n`;
+  txt+=`⏱️ *Horas estudadas:* ${_shareFormatHours(data.totalHours)}\n`;
+  txt+=`📋 *Questões resolvidas:* ${data.quizAnswered||0}\n`;
+  txt+=`🎯 *Taxa de acerto:* ${data.hasQuestions?data.accuracyPct+'%':'—'}\n`;
+  txt+=`📚 *Disciplinas estudadas:* ${data.subjects.length||0}\n`;
+  if(data.subjects.length){
+    txt+=`\n📚 *Disciplinas:*\n`;
+    data.subjects.forEach(s=>{ txt+=`• ${s}\n`; });
+  }
+  txt+=`\n#GymRats #EstudosDiários`;
+  return txt;
+}
+
+// 📋 Copiar texto — resumo em Markdown/WhatsApp pronto para colar
+function copyShareText(){
+  if(!_shareCurrentData) return;
+  const text=buildShareText(_shareCurrentData);
+  const btn=document.getElementById('btn-share-copy');
+  const done=()=>{ if(btn){ const orig=btn.innerHTML; btn.innerHTML='✅ Copiado!'; btn.classList.add('copied'); setTimeout(()=>{btn.innerHTML=orig;btn.classList.remove('copied');},2000); } };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>_shareFallbackCopy(text,done));
+  } else {
+    _shareFallbackCopy(text,done);
+  }
+}
+// Fallback para navegadores/mobile sem suporte à Clipboard API
+function _shareFallbackCopy(text,done){
+  const ta=document.createElement('textarea');
+  ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try{ document.execCommand('copy'); done(); }catch(e){}
+  document.body.removeChild(ta);
+}
+
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeShareModal(); });
+</script>
 </body>
 </html>

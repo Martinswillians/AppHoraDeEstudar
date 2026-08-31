@@ -232,7 +232,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .log-title-txt{font-size:13px;font-weight:600;color:#1a1a18}
 .log-desc-txt{font-size:12px;color:#888;margin-top:2px;line-height:1.5}
 .log-h{font-size:20px;font-weight:800;color:#185FA5}
-.log-list-label{font-size:12px;font-weight:800;color:#666;text-transform:uppercase;letter-spacing:.4px;margin:20px 2px 10px;display:flex;align-items:center;gap:6px}
+.log-list-label{font-size:12px;font-weight:800;color:#666;text-transform:uppercase;letter-spacing:.4px;margin:20px 2px 10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;row-gap:8px}
+.log-list-label .llbl-txt{display:flex;align-items:center;gap:6px}
+.share-btn{margin-left:auto;font-size:11px;font-weight:700;text-transform:none;letter-spacing:0;padding:8px 13px;border-radius:8px;border:1px solid #c8ddf2;background:#f0f7ff;color:#185FA5;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.share-btn:hover{background:#e2f0ff}
+@media (max-width:480px){.share-btn{width:100%;justify-content:center;margin-left:0}}
+.share-modal{background:#0f1420;border-radius:16px;width:100%;max-width:420px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.share-modal .modal-hdr{background:#fff;border-bottom:1px solid #f0eeea}
+.share-modal-body{padding:16px;overflow-y:auto;background:#fff}
+.share-modal-body .form-field{margin-bottom:12px}
+.share-modal-body .form-field label{font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.4px}
+.share-modal-body .form-field input[type=date]{font-size:13px;padding:9px 11px;border:1px solid #e8e6e0;border-radius:8px;font-family:inherit;outline:none}
+.share-card-wrap{border-radius:14px;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,.28);position:relative;line-height:0}
+.share-card-canvas{width:100%;height:auto;display:block}
+.share-empty-msg{font-size:12px;color:#D9534F;text-align:center;margin-top:10px;font-weight:600;display:none}
+.share-actions{display:flex;gap:8px;margin-top:14px}
+.btn-share{flex:1;font-size:13px;font-weight:700;padding:12px 8px;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s}
+.btn-share-dl{background:#1a1a18;color:#fff}
+.btn-share-copy{background:#185FA5;color:#fff}
+.btn-share.copied{background:#1D9E75!important}
+.btn-share:disabled{opacity:.5;cursor:not-allowed}
 .log-hl{font-size:9px;color:#aaa}
 /* ── OVERVIEW ── */
 .ov-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
@@ -1129,18 +1148,9 @@ body.focus-mode #focus-mode-btn{
         </div>
         <div class="form-grid">
           <div class="form-field"><label>Data</label><input type="date" id="d-log-date"/></div>
-          <div class="form-field" id="d-log-hm-wrap">
-            <label>Horas e Minutos</label>
-            <div style="display:flex;align-items:center;gap:5px">
-              <input type="number" id="d-log-hours" min="0" max="24" step="1" placeholder="1" value="1" style="width:100%;text-align:center"/>
-              <span style="font-size:11px;color:#999;flex-shrink:0">h</span>
-              <input type="number" id="d-log-minutes" min="0" max="59" step="5" placeholder="0" value="0" style="width:100%;text-align:center"/>
-              <span style="font-size:11px;color:#999;flex-shrink:0">min</span>
-            </div>
-          </div>
-          <div class="form-field" id="d-log-qty-wrap" style="display:none">
-            <label>Quantidade</label>
-            <input type="number" id="d-log-qty" min="1" step="1" placeholder="5"/>
+          <div class="form-field" id="d-log-hm-wrap" style="display:flex;gap:6px;align-items:flex-end">
+            <div style="flex:1"><label id="d-log-hours-label">Horas</label><input type="number" id="d-log-hours" min="0" max="23" step="1" placeholder="0" value="1" style="text-align:center"/></div>
+            <div style="flex:1"><label>Min</label><input type="number" id="d-log-mins" min="0" max="59" step="5" placeholder="0" value="0" style="text-align:center"/></div>
           </div>
           <div class="form-field">
             <label>Seção</label>
@@ -1151,14 +1161,11 @@ body.focus-mode #focus-mode-btn{
           </div>
           <div class="form-field full"><label>Anotação</label><textarea id="d-log-desc" placeholder="O que você estudou?"></textarea></div>
         </div>
-        <div style="display:flex;align-items:center;gap:12px">
-          <button class="btn-log" id="d-log-submit-btn" onclick="addLog()">Registrar ↗</button>
-          <button type="button" id="d-log-cancel-edit-btn" onclick="cancelLogEdit('d')" style="display:none;background:none;border:none;color:#888;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline">Cancelar edição</button>
-        </div>
+        <button class="btn-log" onclick="addLog()">Registrar ↗</button>
       </div>
-      <div class="log-list-label" style="justify-content:space-between">
-        <span>🗂 Lista de Registros de Estudo</span>
-        <button onclick="openDailyShare()" style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,#185FA5,#1D9E75);color:#fff;border:none;border-radius:20px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer">📊 Compartilhar meus estudos</button>
+      <div class="log-list-label">
+        <span class="llbl-txt">🗂 Lista de Registros de Estudo</span>
+        <button type="button" class="share-btn" onclick="openShareModal()">📊 Compartilhar meus estudos</button>
       </div>
       <div id="d-log-list"></div>
     </div>
@@ -1227,21 +1234,10 @@ body.focus-mode #focus-mode-btn{
         <button type="button" class="log-type-btn active" id="m-log-type-aulas" onclick="setLogType('m','aulas')">📚 Aulas</button>
         <button type="button" class="log-type-btn" id="m-log-type-exercicios" onclick="setLogType('m','exercicios')">📋 Exercícios</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
         <div class="form-field"><label>Data</label><input type="date" id="m-log-date"/></div>
-        <div class="form-field" id="m-log-hm-wrap">
-          <label>Horas / Min</label>
-          <div style="display:flex;align-items:center;gap:4px">
-            <input type="number" id="m-log-hours" min="0" max="24" step="1" placeholder="1" value="1" style="width:100%;text-align:center;padding:11px 4px"/>
-            <span style="font-size:10px;color:#999;flex-shrink:0">h</span>
-            <input type="number" id="m-log-minutes" min="0" max="59" step="5" placeholder="0" value="0" style="width:100%;text-align:center;padding:11px 4px"/>
-            <span style="font-size:10px;color:#999;flex-shrink:0">m</span>
-          </div>
-        </div>
-        <div class="form-field" id="m-log-qty-wrap" style="display:none">
-          <label>Quantidade</label>
-          <input type="number" id="m-log-qty" min="1" step="1" placeholder="5"/>
-        </div>
+        <div class="form-field"><label id="m-log-hours-label">Horas</label><input type="number" id="m-log-hours" min="0" max="23" step="1" placeholder="0" value="1" style="text-align:center"/></div>
+        <div class="form-field"><label>Min</label><input type="number" id="m-log-mins" min="0" max="59" step="5" placeholder="0" value="0" style="text-align:center"/></div>
       </div>
       <div class="form-field" style="margin-bottom:8px">
         <label>Seção</label>
@@ -1251,12 +1247,11 @@ body.focus-mode #focus-mode-btn{
         </div>
       </div>
       <div class="form-field" style="margin-bottom:10px"><label>Anotação</label><textarea id="m-log-desc" style="min-height:65px;resize:none;line-height:1.5" placeholder="O que você estudou?"></textarea></div>
-      <button class="btn-log" style="width:100%;padding:11px" id="m-log-submit-btn" onclick="mAddLog()">Registrar ↗</button>
-      <button type="button" id="m-log-cancel-edit-btn" onclick="cancelLogEdit('m')" style="display:none;width:100%;margin-top:8px;background:none;border:none;color:#888;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline">Cancelar edição</button>
+      <button class="btn-log" style="width:100%;padding:11px" onclick="mAddLog()">Registrar ↗</button>
     </div>
-    <div class="log-list-label" style="margin:0 0 8px;justify-content:space-between">
-      <span>🗂 Lista de Registros de Estudo</span>
-      <button onclick="openDailyShare()" style="display:flex;align-items:center;gap:4px;background:linear-gradient(135deg,#185FA5,#1D9E75);color:#fff;border:none;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer">📊 Compartilhar</button>
+    <div class="log-list-label" style="margin:0 0 8px">
+      <span class="llbl-txt">🗂 Lista de Registros de Estudo</span>
+      <button type="button" class="share-btn" onclick="openShareModal()">📊 Compartilhar meus estudos</button>
     </div>
     <div id="m-log-list"></div>
   </div>
@@ -1286,16 +1281,87 @@ let currentUser = null;
 // As funções abaixo imitam a API do localStorage (getItem/setItem/removeItem),
 // mas de forma assíncrona, para minimizar mudanças no resto do app.
 function kvRef(key){ return fbDb.collection('users').doc(currentUser.uid).collection('kv').doc(key); }
-async function cloudGetItem(key){
-  try{
-    const snap = await kvRef(key).get();
-    return snap.exists ? (snap.data().v ?? null) : null;
-  }catch(e){ console.error('[nuvem] erro ao ler "'+key+'":', e); cloudShowError(); return null; }
-}
+// ── FIRESTORE SIZE LIMIT ─────────────────────────────────────
+// O Firestore tem limite de 1MB por documento. Imagens em base64
+// são grandes (100-500KB cada). Estratégia:
+// - Estado principal (done, logs, codes, titles, review, urls) → doc normal
+// - Cada nota com imagem → doc separado "jt3_imgs_<courseId>_<noteKey>_<noteId>"
+// - O estado principal guarda notas SEM imgs (leve)
+// - Ao carregar, busca as imagens e monta state.notes completo
+
 async function cloudSetItem(key, value){
+  // Se é o estado principal do curso, separa imagens antes de salvar
+  if(key && key.startsWith('jt3_') && !key.includes('_imgs_')){
+    try{
+      let parsed;
+      try{ parsed = JSON.parse(value); }catch(e){ parsed = null; }
+      if(parsed && parsed.notes){
+        // 1. Salvar imagens em docs separados
+        const notesWithoutImgs = {};
+        const imgSavePromises = [];
+        Object.entries(parsed.notes).forEach(([noteKey, noteList])=>{
+          notesWithoutImgs[noteKey] = (noteList||[]).map(note=>{
+            const hasImgs = note.imgs && note.imgs.length > 0;
+            if(hasImgs){
+              // Salvar imgs deste nota em doc próprio
+              const imgKey = key+'_imgs_'+noteKey+'_'+note.id;
+              imgSavePromises.push(
+                kvRef(imgKey).set({v: JSON.stringify(note.imgs), _at: Date.now()})
+                  .catch(e=>console.warn('[nuvem] erro ao salvar imagem:', e))
+              );
+              return Object.assign({}, note, {imgs:[], _hasCloudImgs:true});
+            }
+            return note;
+          });
+        });
+        // Salvar estado sem imgs
+        const lightValue = JSON.stringify(Object.assign({}, parsed, {notes: notesWithoutImgs}));
+        await kvRef(key).set({v: lightValue, _at: Date.now()});
+        // Salvar imagens em paralelo
+        if(imgSavePromises.length) await Promise.all(imgSavePromises);
+        return;
+      }
+    }catch(e){ console.error('[nuvem] erro ao processar save com imagens:', e); }
+  }
   try{
     await kvRef(key).set({v: value, _at: Date.now()});
   }catch(e){ console.error('[nuvem] erro ao salvar "'+key+'":', e); cloudShowError(); }
+}
+
+async function cloudGetItem(key){
+  try{
+    const snap = await kvRef(key).get();
+    if(!snap.exists) return null;
+    const value = snap.data().v ?? null;
+    // Se é estado principal, recarregar imagens dos docs separados
+    if(key && key.startsWith('jt3_') && !key.includes('_imgs_') && value){
+      try{
+        const parsed = JSON.parse(value);
+        if(parsed && parsed.notes){
+          // Buscar imagens de notas que têm _hasCloudImgs
+          const imgFetchPromises = [];
+          Object.entries(parsed.notes).forEach(([noteKey, noteList])=>{
+            (noteList||[]).forEach((note, idx)=>{
+              if(note._hasCloudImgs){
+                const imgKey = key+'_imgs_'+noteKey+'_'+note.id;
+                imgFetchPromises.push(
+                  kvRef(imgKey).get().then(s=>{
+                    if(s.exists && s.data().v){
+                      try{ parsed.notes[noteKey][idx].imgs = JSON.parse(s.data().v); }catch(e){}
+                    }
+                    delete parsed.notes[noteKey][idx]._hasCloudImgs;
+                  }).catch(()=>{})
+                );
+              }
+            });
+          });
+          if(imgFetchPromises.length) await Promise.all(imgFetchPromises);
+          return JSON.stringify(parsed);
+        }
+      }catch(e){ console.error('[nuvem] erro ao recarregar imagens:', e); }
+    }
+    return value;
+  }catch(e){ console.error('[nuvem] erro ao ler "'+key+'":', e); cloudShowError(); return null; }
 }
 async function cloudRemoveItem(key){
   try{ await kvRef(key).delete(); }catch(e){ console.error('[nuvem] erro ao remover "'+key+'":', e); }
@@ -2192,7 +2258,7 @@ function updateStats(){
   const {totalDone,pct,secsDone,notesCount,codesCount,hours,logHours,estimatedHours,sessions}=calcStats();
   const s=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
   const T=TOTAL, NS=SECTIONS.length;
-  const hoursStr = hours.toFixed(1)+'h';
+  const hoursStr = formatHoursHM(hours)+'h';
   const hoursSuffix = logHours === 0 && estimatedHours > 0 ? ' ~' : '';
   s('hdr-pct',pct+'%'); s('hdr-aulas',totalDone+'/'+T); s('hdr-hours',hoursStr+hoursSuffix);
   s('st-pct',pct+'%'); s('st-aulas',totalDone+'/'+T); s('st-secs',secsDone+'/'+NS);
@@ -2700,7 +2766,13 @@ function noteDrop(event, k, targetId){
   _noteDragId = null; _noteDragKey = null;
 }
 function deleteNote(k,id){
-  if(!state.notes[k]) return; state.notes[k]=state.notes[k].filter(n=>n.id!==id); save(); updateStats();
+  if(!state.notes[k]) return;
+  state.notes[k]=state.notes[k].filter(n=>n.id!==id);
+  save(); updateStats();
+  // Limpar doc de imagem no Firestore se existir
+  if(typeof cloudRemoveItem==='function' && typeof currentUser!=='undefined' && currentUser){
+    cloudRemoveItem(stateKey()+'_imgs_'+k+'_'+id).catch(()=>{});
+  }
   const c=document.getElementById('d-notes-'+k); if(c) c.innerHTML=renderNotesHTML(k);
   const mc=document.getElementById('m-notes-'+k); if(mc) mc.innerHTML=renderNotesHTML(k);
   dRenderGlobalNotes(); _refreshSummaryIfOpen();
@@ -3251,7 +3323,6 @@ function deleteGCode(k,id){
 // ── SELETOR MÚLTIPLO DE SEÇÃO (Diário) ──────────────────────────
 let _logSecSel = { d: [], m: [] }; // seções marcadas por formulário (desktop/mobile)
 let _logType = { d: 'aulas', m: 'aulas' }; // 'aulas' | 'exercicios'
-let _editingLogId = { d: null, m: null }; // id do registro em edição (null = criando novo)
 
 function setLogType(prefix, type){
   _logType[prefix]=type;
@@ -3259,10 +3330,15 @@ function setLogType(prefix, type){
   const btnE=document.getElementById(prefix+'-log-type-exercicios');
   if(btnA) btnA.classList.toggle('active', type==='aulas');
   if(btnE) btnE.classList.toggle('active', type==='exercicios');
-  const hmWrap=document.getElementById(prefix+'-log-hm-wrap');
-  const qtyWrap=document.getElementById(prefix+'-log-qty-wrap');
-  if(hmWrap) hmWrap.style.display=type==='exercicios'?'none':'block';
-  if(qtyWrap) qtyWrap.style.display=type==='exercicios'?'block':'none';
+  const label=document.getElementById(prefix+'-log-hours-label');
+  const input=document.getElementById(prefix+'-log-hours');
+  if(type==='exercicios'){
+    if(label) label.textContent='Quantidade';
+    if(input){ input.placeholder='5'; input.step='1'; input.min='1'; input.value=input.value==='1'?'1':input.value; }
+  } else {
+    if(label) label.textContent='Horas';
+    if(input){ input.placeholder='1.5'; input.step='0.5'; input.min='0.5'; }
+  }
 }
 
 // Registro manual de exercícios: soma na mesma entrada consolidada do dia (a mesma
@@ -3285,84 +3361,76 @@ function addManualQuizEntry(date, qty, secIds, note){
   save(); updateStats(); renderLogList(); mRenderLog(); updateStreakUI();
 }
 
-function resetLogForm(prefix){
-  const hoursEl=document.getElementById(prefix+'-log-hours');
-  const minEl=document.getElementById(prefix+'-log-minutes');
-  const qtyEl=document.getElementById(prefix+'-log-qty');
-  if(hoursEl) hoursEl.value='1';
-  if(minEl) minEl.value='0';
-  if(qtyEl) qtyEl.value='';
-  const descEl=document.getElementById(prefix+'-log-desc'); if(descEl) descEl.value='';
-  resetSecPicker(prefix);
-  _editingLogId[prefix]=null;
-  const btn=document.getElementById(prefix+'-log-submit-btn'); if(btn) btn.textContent='Registrar ↗';
-  const cancelBtn=document.getElementById(prefix+'-log-cancel-edit-btn'); if(cancelBtn) cancelBtn.style.display='none';
-}
-function cancelLogEdit(prefix){ resetLogForm(prefix); }
-
-function editLog(id){
-  const l=state.logs.find(x=>x.id===id);
-  if(!l) return;
-  const prefix=isMobile()?'m':'d';
-  const dateEl=document.getElementById(prefix+'-log-date'); if(dateEl) dateEl.value=l.date;
-  if(l.autoQuiz){
-    setLogType(prefix,'exercicios');
-    const qtyEl=document.getElementById(prefix+'-log-qty'); if(qtyEl) qtyEl.value=l.quizAnswered||1;
-  } else {
-    setLogType(prefix,'aulas');
-    const totalMin=Math.round((l.hours||0)*60);
-    const hoursEl=document.getElementById(prefix+'-log-hours'); if(hoursEl) hoursEl.value=Math.floor(totalMin/60);
-    const minEl=document.getElementById(prefix+'-log-minutes'); if(minEl) minEl.value=totalMin%60;
-  }
-  _logSecSel[prefix]= l.secs&&l.secs.length ? [...l.secs] : (l.sec?[l.sec]:[]);
-  updateSecPickerLabel(prefix);
-  const descEl=document.getElementById(prefix+'-log-desc'); if(descEl) descEl.value=l.autoQuiz?'':(l.desc||'');
-  _editingLogId[prefix]=id;
-  const btn=document.getElementById(prefix+'-log-submit-btn'); if(btn) btn.textContent='💾 Salvar edição';
-  const cancelBtn=document.getElementById(prefix+'-log-cancel-edit-btn'); if(cancelBtn) cancelBtn.style.display='inline-block';
-  const form=document.querySelector(prefix==='d'?'#ctab-diario .log-form':'#ms-diario .log-form');
-  if(form && typeof form.scrollIntoView==='function') form.scrollIntoView({behavior:'smooth', block:'start'});
-}
-
-function addLog(){ submitLogForm('d'); }
-function mAddLog(){ submitLogForm('m'); }
-
-function submitLogForm(prefix){
-  const dateEl=document.getElementById(prefix+'-log-date');
+function addLog(){
+  const dateEl=document.getElementById('d-log-date');
+  const hoursEl=document.getElementById('d-log-hours');
+  const minsEl=document.getElementById('d-log-mins');
   const date=dateEl?.value;
-  const secs=[..._logSecSel[prefix]];
-  const desc=document.getElementById(prefix+'-log-desc')?.value.trim();
-  const errId=prefix+'-log-err';
-  if(!date){ markLogFieldError(dateEl,errId,'Informe a data da sessão.'); return; }
-  const editingId=_editingLogId[prefix];
-  if(_logType[prefix]==='exercicios'){
-    const qtyEl=document.getElementById(prefix+'-log-qty');
-    const qty=parseInt(qtyEl?.value);
-    if(!qty||qty<1){ markLogFieldError(qtyEl,errId,'Informe uma quantidade válida (mínimo 1).'); return; }
-    if(editingId){
-      const l=state.logs.find(x=>x.id===editingId);
-      if(l){ l.date=date; l.quizAnswered=qty; l.desc=buildQuizLogDesc(l)+(desc?' — '+desc:''); if(!state.activityDays) state.activityDays={}; state.activityDays[date]=true; save(); updateStats(); renderLogList(); mRenderLog(); }
-    } else {
-      addManualQuizEntry(date,qty,secs,desc);
-    }
+  const hoursVal=parseInt(hoursEl?.value||'0')||0;
+  const minsVal=parseInt(minsEl?.value||'0')||0;
+  const hours=hoursVal+(minsVal/60);
+  const hoursRaw=hoursEl?.value;
+  const secs=[..._logSecSel.d];
+  const desc=document.getElementById('d-log-desc')?.value.trim();
+  if(!date){ markLogFieldError(dateEl,'d-log-err','Informe a data da sessão.'); return; }
+  if(_logType.d==='exercicios'){
+    const qty=parseInt(hoursRaw);
+    if(!qty||qty<1){ markLogFieldError(hoursEl,'d-log-err','Informe uma quantidade válida (mínimo 1).'); return; }
+    addManualQuizEntry(date,qty,secs,desc);
   } else {
-    const hoursEl=document.getElementById(prefix+'-log-hours');
-    const minEl=document.getElementById(prefix+'-log-minutes');
-    const h=parseInt(hoursEl?.value)||0, m=parseInt(minEl?.value)||0;
-    const totalHours=Math.round((h+m/60)*100)/100;
-    if(totalHours<=0){ markLogFieldError(hoursEl,errId,'Informe horas e/ou minutos estudados.'); return; }
-    if(editingId){
-      const l=state.logs.find(x=>x.id===editingId);
-      if(l){ l.date=date; l.hours=totalHours; l.sec=secs[0]||''; l.secs=secs; l.desc=desc; }
+    if(hoursVal===0&&minsVal===0){ markLogFieldError(hoursEl,'d-log-err','Informe as horas estudadas para registrar a sessão.'); return; }
+    if(_editingLogId){
+      // Modo edição
+      const idx=state.logs.findIndex(l=>l.id===_editingLogId);
+      if(idx>=0){ state.logs[idx]=Object.assign({},state.logs[idx],{date,hours,secs,sec:secs[0]||'',desc}); }
+      cancelEditLog();
     } else {
-      state.logs.unshift({id:Date.now(),date,hours:totalHours,sec:secs[0]||'',secs,desc});
+      state.logs.unshift({id:Date.now(),date,hours,sec:secs[0]||'',secs,desc});
+    }
+    if(!state.activityDays) state.activityDays={};
+    state.activityDays[date]=true;
+    save(); updateStats(); renderLogList(); updateStreakUI();
+    if(document.getElementById('activity-chart')) dRenderOverview();
+  }
+  document.getElementById('d-log-hours').value=_logType.d==='exercicios'?'':'1';
+  if(minsEl) minsEl.value='0';
+  document.getElementById('d-log-desc').value='';
+  resetSecPicker('d');
+}
+function mAddLog(){
+  const dateEl=document.getElementById('m-log-date');
+  const hoursEl=document.getElementById('m-log-hours');
+  const minsEl=document.getElementById('m-log-mins');
+  const date=dateEl?.value;
+  const hoursVal=parseInt(hoursEl?.value||'0')||0;
+  const minsVal=parseInt(minsEl?.value||'0')||0;
+  const hours=hoursVal+(minsVal/60);
+  const hoursRaw=hoursEl?.value;
+  const secs=[..._logSecSel.m];
+  const desc=document.getElementById('m-log-desc')?.value.trim();
+  if(!date){ markLogFieldError(dateEl,'m-log-err','Informe a data da sessão.'); return; }
+  if(_logType.m==='exercicios'){
+    const qty=parseInt(hoursRaw);
+    if(!qty||qty<1){ markLogFieldError(hoursEl,'m-log-err','Informe uma quantidade válida (mínimo 1).'); return; }
+    addManualQuizEntry(date,qty,secs,desc);
+  } else {
+    if(hoursVal===0&&minsVal===0){ markLogFieldError(hoursEl,'m-log-err','Informe as horas estudadas para registrar a sessão.'); return; }
+    if(_editingLogId){
+      const idx=state.logs.findIndex(l=>l.id===_editingLogId);
+      if(idx>=0){ state.logs[idx]=Object.assign({},state.logs[idx],{date,hours,secs,sec:secs[0]||'',desc}); }
+      cancelEditLog();
+    } else {
+      state.logs.unshift({id:Date.now(),date,hours,sec:secs[0]||'',secs,desc});
     }
     if(!state.activityDays) state.activityDays={};
     state.activityDays[date]=true;
     save(); updateStats(); renderLogList(); mRenderLog(); updateStreakUI();
     if(document.getElementById('activity-chart')) dRenderOverview();
   }
-  resetLogForm(prefix);
+  if(hoursEl) hoursEl.value=_logType.m==='exercicios'?'':'1';
+  if(minsEl) minsEl.value='0';
+  document.getElementById('m-log-desc').value='';
+  resetSecPicker('m');
 }
 
 function populateLogSelects(){
@@ -3473,6 +3541,7 @@ function renderLogList(){
     const titleTxt = l.autoQuiz ? '📋 Exercícios do dia' : logSectionLabel(l,sm);
     const valTxt = l.autoQuiz ? `${l.quizAnswered||0} questões` : `${formatHoursHM(l.hours)}h`;
     const subLbl = l.autoQuiz ? ((l.quizAnswered||0)===1?'Resolvida':'Resolvidas') : 'estudadas';
+    const canEdit = !l.autoQuiz; // não editar registros automáticos de exercícios
     return `<div class="log-card">
       <div class="log-date-blk"><div class="log-day">${d}</div><div class="log-month">${months[parseInt(m)-1]}</div></div>
       <div class="log-sep"></div>
@@ -3481,14 +3550,77 @@ function renderLogList(){
         ${l.desc?`<div class="log-desc-txt">${l.desc}</div>`:''}
       </div>
       <div style="text-align:right;flex-shrink:0"><div class="log-h">${valTxt}</div><div class="log-hl">${subLbl}</div></div>
-      <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
-        <button class="del-btn" onclick="editLog(${l.id})" style="font-size:12px" title="Editar registro">✏️</button>
-        <button class="del-btn" onclick="deleteLog(${l.id})" style="font-size:13px" title="Excluir registro">✕</button>
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        ${canEdit?`<button class="del-btn" onclick="startEditLog(${l.id})" style="font-size:13px;background:#f0f7ff;color:#185FA5;border-color:#c8ddf2" title="Editar registro">✏️</button>`:''}
+        <button class="del-btn" onclick="deleteLog(${l.id})" style="font-size:13px">✕</button>
       </div>
     </div>`;
   }).join('');
 }
 function deleteLog(id){ state.logs=state.logs.filter(l=>l.id!==id); save(); updateStats(); renderLogList(); mRenderLog(); }
+
+// ── EDIÇÃO DE REGISTROS DO DIÁRIO ─────────────────────────────
+let _editingLogId = null;
+
+function startEditLog(id){
+  const log = state.logs.find(l=>l.id===id);
+  if(!log) return;
+  _editingLogId = id;
+
+  // Preencher formulário desktop
+  const dateEl = document.getElementById('d-log-date');
+  const hoursEl = document.getElementById('d-log-hours');
+  const minsEl  = document.getElementById('d-log-mins');
+  const descEl  = document.getElementById('d-log-desc');
+  if(dateEl) dateEl.value = log.date||'';
+  if(hoursEl){
+    const h = parseFloat(log.hours)||0;
+    const totalMin = Math.round(h*60);
+    hoursEl.value = Math.floor(totalMin/60);
+    if(minsEl) minsEl.value = totalMin%60;
+  }
+  if(descEl) descEl.value = log.desc||'';
+
+  // Mostrar indicador de edição
+  const addBtn = document.getElementById('d-log-add-btn');
+  if(addBtn) addBtn.textContent = '💾 Salvar edição';
+
+  // Mostrar link cancelar
+  let cancelLink = document.getElementById('d-log-cancel-edit');
+  if(!cancelLink){
+    cancelLink = document.createElement('a');
+    cancelLink.id = 'd-log-cancel-edit';
+    cancelLink.textContent = 'Cancelar edição';
+    cancelLink.href = '#';
+    cancelLink.style.cssText='font-size:12px;color:#888;cursor:pointer;margin-left:8px;text-decoration:underline';
+    cancelLink.onclick = (e)=>{ e.preventDefault(); cancelEditLog(); };
+    addBtn?.parentElement?.insertBefore(cancelLink, addBtn.nextSibling);
+  }
+  cancelLink.style.display='inline';
+
+  // Scroll para o formulário
+  document.getElementById('d-log-date')?.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+function cancelEditLog(){
+  _editingLogId = null;
+  const addBtn = document.getElementById('d-log-add-btn');
+  if(addBtn) addBtn.textContent = '+ Registrar';
+  const cancelLink = document.getElementById('d-log-cancel-edit');
+  if(cancelLink) cancelLink.style.display='none';
+  // Resetar campos
+  const hoursEl=document.getElementById('d-log-hours');
+  const minsEl=document.getElementById('d-log-mins');
+  const mHoursEl=document.getElementById('m-log-hours');
+  const mMinsEl=document.getElementById('m-log-mins');
+  if(hoursEl) hoursEl.value='1';
+  if(minsEl) minsEl.value='0';
+  if(mHoursEl) mHoursEl.value='1';
+  if(mMinsEl) mMinsEl.value='0';
+  document.getElementById('d-log-desc')?.setAttribute('value','');
+  const mAddBtnTxt = document.getElementById('m-log-add-btn');
+  if(mAddBtnTxt) mAddBtnTxt.textContent='+ Registrar';
+}
 
 // -- OVERVIEW -------------------------------------------------
 function dRenderOverview(){
@@ -4344,10 +4476,7 @@ function mRenderLog(){
         ${l.desc?`<div class="log-desc-txt">${l.desc}</div>`:''}
       </div>
       <div style="text-align:right;flex-shrink:0"><div class="log-h">${valTxt}</div><div class="log-hl">${subLbl}</div></div>
-      <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
-        <button class="del-btn" onclick="editLog(${l.id})" style="font-size:12px" title="Editar registro">✏️</button>
-        <button class="del-btn" onclick="deleteLog(${l.id})" style="font-size:13px" title="Excluir registro">✕</button>
-      </div>
+      <button class="del-btn" onclick="deleteLog(${l.id})" style="font-size:13px">✕</button>
     </div>`;
   }).join('');
 }
@@ -5677,7 +5806,7 @@ function renderActivityChart(mode){
     const valLabel=d.hours>0?(d.hours<1?Math.round(d.hours*60)+'m':formatHoursHM(d.hours)+'h'):'';
     return `<div class="chart-bar-col">
       <div class="chart-val">${valLabel}</div>
-      <div class="chart-bar ${d.isToday?'today':'past'}" style="height:${barH}%;background:${color}" title="${d.label}: ${d.hours<1?Math.round(d.hours*60)+'min':formatHoursHM(d.hours)+'h'}"></div>
+      <div class="chart-bar ${d.isToday?'today':'past'}" style="height:${barH}%;background:${color}" title="${d.label}: ${formatHoursHM(d.hours)}h"></div>
       <div class="chart-day">${days<=7?d.label:d.date.slice(5)}</div>
     </div>`;
   }).join('');
@@ -5731,7 +5860,7 @@ function dRenderOverview(){
       </div>
       <div style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-          <span style="font-size:11px;font-weight:700;color:#555">Hoje (${todayStr}) — ${today.hours.toFixed(1)}h / ${dailyHoursGoal.toFixed(1)}h</span>
+          <span style="font-size:11px;font-weight:700;color:#555">Hoje (${todayStr}) — ${formatHoursHM(today.hours)}h / ${formatHoursHM(dailyHoursGoal)}h</span>
           <span style="font-size:10px;font-weight:800;color:${dailyColor}">${dailyPct}%</span>
         </div>
         <div class="goal-bar-track"><div class="goal-bar-fill" style="width:${dailyPct}%;background:${dailyColor}"></div></div>
@@ -6723,239 +6852,6 @@ function _cursosMsg(containerId, msg, color){
     setTimeout(()=>{ if(el) el.textContent=''; },4000); }
 }
 
-// ── COMPARTILHAR ESTUDOS DO DIA ────────────────────────────────
-function openDailyShare(){
-  const ov=document.getElementById('daily-share-overlay');
-  if(!ov) return;
-  ov.classList.add('open');
-  const picker=document.getElementById('share-date-picker');
-  if(picker) picker.value=todayStr();
-  setTimeout(refreshShareCard, 80);
-}
-function closeDailyShare(){
-  document.getElementById('daily-share-overlay')?.classList.remove('open');
-}
-
-function getShareData(date){
-  const dayLogs=state.logs.filter(l=>l.date===date);
-  const aulaLogs=dayLogs.filter(l=>!l.autoQuiz && (parseFloat(l.hours)||0)>0);
-  const quizLog=dayLogs.find(l=>l.autoQuiz);
-  const totalHours=aulaLogs.reduce((s,l)=>s+(parseFloat(l.hours)||0),0);
-  const totalQuestions=quizLog?(quizLog.quizAnswered||0):0;
-  const totalCorrect=quizLog?(quizLog.quizCorrect||0):0;
-  const sm={}; SECTIONS.forEach(s=>sm[s.id]=s);
-  // Aulas: por seção, pegar título e horas
-  const aulasMap={}; // secId -> {title, hours, lessons:[]}
-  aulaLogs.forEach(l=>{
-    (l.secs&&l.secs.length?l.secs:[l.sec]).filter(Boolean).forEach(id=>{
-      const s=sm[id]; if(!s) return;
-      if(!aulasMap[id]) aulasMap[id]={title:s.title,hours:0,desc:[]};
-      aulasMap[id].hours+=parseFloat(l.hours)||0;
-      if(l.desc) aulasMap[id].desc.push(l.desc);
-    });
-    // Se não tem seção mas tem horas, mostra como "Estudo geral"
-    if(!(l.secs&&l.secs.length) && !l.sec && (parseFloat(l.hours)||0)>0){
-      if(!aulasMap['_geral']) aulasMap['_geral']={title:'Estudo geral',hours:0,desc:[]};
-      aulasMap['_geral'].hours+=parseFloat(l.hours)||0;
-      if(l.desc) aulasMap['_geral'].desc.push(l.desc);
-    }
-  });
-  const aulaItems=Object.values(aulasMap).sort((a,b)=>b.hours-a.hours);
-  // Disciplinas de exercícios
-  const quizSubjSet=new Set();
-  (quizLog?.quizSubjects||[]).forEach(code=>{
-    const s=SECTIONS.find(x=>'S'+x.num===code||x.id===code);
-    quizSubjSet.add(s?s.title:code);
-  });
-  const allDiscSet=new Set([...aulaItems.map(a=>a.title),...quizSubjSet]);
-  const userName=currentUser?.displayName||currentUser?.email?.split('@')[0]||'Estudante';
-  const courseName=ACTIVE_COURSE?.name||'';
-  return {date,totalHours,totalQuestions,totalCorrect,aulaItems,quizSubjects:[...quizSubjSet],disciplines:[...allDiscSet],userName,courseName};
-}
-
-function drawShareCanvas(date){
-  const canvas=document.getElementById('share-canvas'); if(!canvas) return;
-  const D=getShareData(date);
-  const hasAulas=D.aulaItems.length>0, hasQuiz=D.totalQuestions>0;
-  const aulaRows=Math.min(D.aulaItems.length,5);
-  const W=520;
-  const H=82 + 82 + (hasAulas?(22+aulaRows*20+8):0) + (hasQuiz?(22+42+8):0) + 30;
-  canvas.width=W*2; canvas.height=H*2;
-  canvas.style.height=H+'px';
-  const ctx=canvas.getContext('2d');
-  ctx.scale(2,2);
-
-  // Fundo degradê
-  const grad=ctx.createLinearGradient(0,0,W,H);
-  grad.addColorStop(0,'#0a1628'); grad.addColorStop(1,'#0d2a4a');
-  ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
-
-  // Faixa lateral
-  const accent=ctx.createLinearGradient(0,0,0,H);
-  accent.addColorStop(0,'#185FA5'); accent.addColorStop(1,'#1D9E75');
-  ctx.fillStyle=accent; ctx.fillRect(0,0,6,H);
-
-  // Cabeçalho
-  const [yr,mo,dy]=date.split('-');
-  const months=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  const dateLabel=`${parseInt(dy)} de ${months[parseInt(mo)-1]} de ${yr}`;
-  ctx.fillStyle='rgba(255,255,255,0.10)'; ctx.fillRect(18,14,W-36,52);
-  ctx.fillStyle='#fff'; ctx.font='bold 14px system-ui,sans-serif';
-  ctx.fillText('🎓 Hora de Estudar', 28,33);
-  ctx.font='11px system-ui,sans-serif'; ctx.fillStyle='#7ab3d4';
-  ctx.fillText(dateLabel, 28,49);
-  ctx.textAlign='right';
-  ctx.fillStyle='#fff'; ctx.font='bold 13px system-ui,sans-serif';
-  ctx.fillText(D.userName, W-20,33);
-  if(D.courseName){ ctx.font='10px system-ui,sans-serif'; ctx.fillStyle='#7ab3d4';
-    ctx.fillText(D.courseName.length>40?D.courseName.slice(0,38)+'…':D.courseName,W-20,49); }
-  ctx.textAlign='left';
-
-  // Cards de métricas — 4 com quiz, 2 sem quiz
-  const stats=hasQuiz?[
-    {label:'Horas\nEstudadas',    value:D.totalHours>0?formatHoursHM(D.totalHours)+'h':'—',          color:'#185FA5', bg:'rgba(24,95,165,.22)'},
-    {label:'Questões\nResolvidas', value:String(D.totalQuestions),                                      color:'#1D9E75', bg:'rgba(29,158,117,.22)'},
-    {label:'Taxa de\nAcerto',     value:Math.round(D.totalCorrect/D.totalQuestions*100)+'%',           color:'#f97316', bg:'rgba(249,115,22,.22)'},
-    {label:'Disciplinas',          value:String(D.disciplines.length),                                   color:'#a78bfa', bg:'rgba(167,139,250,.22)'},
-  ]:[
-    {label:'Horas\nEstudadas',    value:D.totalHours>0?formatHoursHM(D.totalHours)+'h':'—',          color:'#185FA5', bg:'rgba(24,95,165,.22)'},
-    {label:'Disciplinas\nEstudadas', value:String(D.disciplines.length),                               color:'#a78bfa', bg:'rgba(167,139,250,.22)'},
-  ];
-  const numCards=stats.length;
-  const cw=(W-18-numCards*5)/numCards, ch=64, cy=76;
-  stats.forEach((s,i)=>{
-    const cx=18+i*(cw+5);
-    ctx.fillStyle=s.bg; roundRect(ctx,cx,cy,cw,ch,7); ctx.fill();
-    ctx.strokeStyle=s.color+'55'; ctx.lineWidth=1; roundRect(ctx,cx,cy,cw,ch,7); ctx.stroke();
-    ctx.fillStyle=s.color; ctx.font='bold 20px system-ui,sans-serif'; ctx.textAlign='center';
-    ctx.fillText(s.value,cx+cw/2,cy+28);
-    ctx.fillStyle='rgba(255,255,255,0.60)'; ctx.font='8.5px system-ui,sans-serif';
-    s.label.split('\n').forEach((ln,li)=>ctx.fillText(ln,cx+cw/2,cy+40+li*10));
-  });
-  ctx.textAlign='left';
-  let curY=cy+ch+14;
-
-  // Seção AULAS
-  if(hasAulas){
-    ctx.fillStyle='rgba(24,95,165,0.18)'; roundRect(ctx,18,curY,W-36,18+aulaRows*20+6,8); ctx.fill();
-    ctx.fillStyle='#4da3e8'; ctx.font='bold 10px system-ui,sans-serif';
-    ctx.fillText('📚 AULAS ESTUDADAS', 28, curY+13); curY+=22;
-    D.aulaItems.slice(0,5).forEach(a=>{
-      const hm=formatHoursHM(a.hours)+'h';
-      const title=a.title.length>52?a.title.slice(0,50)+'…':a.title;
-      ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='10px system-ui,sans-serif';
-      ctx.fillText('•  '+title, 28, curY+11);
-      ctx.fillStyle='#7ab3d4'; ctx.font='bold 9.5px system-ui,sans-serif'; ctx.textAlign='right';
-      ctx.fillText(hm, W-24, curY+11); ctx.textAlign='left';
-      curY+=20;
-    });
-    curY+=8;
-  }
-
-  // Seção QUESTÕES — só quando houver questões respondidas
-  if(hasQuiz){
-    const pct=Math.round(D.totalCorrect/D.totalQuestions*100);
-    ctx.fillStyle='rgba(29,158,117,0.18)'; roundRect(ctx,18,curY,W-36,42+6,8); ctx.fill();
-    ctx.fillStyle='#1D9E75'; ctx.font='bold 10px system-ui,sans-serif';
-    ctx.fillText('📋 QUESTÕES RESOLVIDAS', 28, curY+13); curY+=20;
-    ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='10px system-ui,sans-serif';
-    ctx.fillText(`• ${D.totalQuestions} questões  —  ${D.totalCorrect} certas (${pct}% de acerto)`, 28, curY+11);
-    curY+=16;
-    if(D.quizSubjects.length>0){
-      const subjs=D.quizSubjects.slice(0,4).join(', ')+(D.quizSubjects.length>4?' +mais':'');
-      ctx.fillStyle='rgba(255,255,255,0.50)'; ctx.font='9px system-ui,sans-serif';
-      ctx.fillText('   Matérias: '+subjs, 28, curY+8); curY+=16;
-    }
-    curY+=6;
-  }
-
-  // Rodapé
-  ctx.fillStyle='rgba(255,255,255,0.15)'; ctx.fillRect(0,H-24,W,1);
-  ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.font='9.5px system-ui,sans-serif';
-  ctx.fillText('🏆 Hora de Estudar  ·  #GymRats #EstudosDiários', 18, H-8);
-  ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,0.25)';
-  ctx.fillText('martinswillians.github.io', W-18, H-8);
-  ctx.textAlign='left';
-}
-
-function roundRect(ctx,x,y,w,h,r){
-  ctx.beginPath();
-  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
-  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
-  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
-  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
-  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
-  ctx.closePath();
-}
-
-function refreshShareCard(){
-  const picker=document.getElementById('share-date-picker');
-  const date=picker?.value||todayStr();
-  drawShareCanvas(date);
-}
-
-function downloadShareCard(){
-  const canvas=document.getElementById('share-canvas'); if(!canvas) return;
-  const picker=document.getElementById('share-date-picker');
-  const date=(picker?.value||todayStr()).replace(/-/g,'');
-  const filename=`estudos-${date}.png`;
-  canvas.toBlob(async blob=>{
-    if(!blob) return;
-    // iOS Safari / Android Chrome: usa Web Share API para "Salvar imagem" nativo
-    if(navigator.share && navigator.canShare && navigator.canShare({files:[new File([blob],filename,{type:'image/png'})]})){
-      try{
-        await navigator.share({files:[new File([blob],filename,{type:'image/png'})], title:'Meus estudos do dia'});
-        return;
-      }catch(e){ /* usuário cancelou ou share falhou — cai no fallback abaixo */ }
-    }
-    // Fallback: URL de objeto (funciona no desktop e Android)
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url; a.download=filename;
-    document.body.appendChild(a); a.click();
-    document.body.removeChild(a);
-    setTimeout(()=>URL.revokeObjectURL(url),1000);
-  },'image/png');
-}
-
-function copyShareText(){
-  const picker=document.getElementById('share-date-picker');
-  const date=picker?.value||todayStr();
-  const D=getShareData(date);
-  const [y,m,d]=date.split('-');
-  const months=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  const hm=D.totalHours>0?formatHoursHM(D.totalHours)+'h':'—';
-  const pct=D.totalQuestions>0?Math.round(D.totalCorrect/D.totalQuestions*100):0;
-  let txt=`📊 *Estudos do dia — ${parseInt(d)} de ${months[parseInt(m)-1]} de ${y}*\n`;
-  txt+=`👤 *${D.userName}*`;
-  if(D.courseName) txt+=`  |  📘 ${D.courseName.length>50?D.courseName.slice(0,48)+'…':D.courseName}`;
-  txt+='\n\n';
-  if(D.totalHours>0){
-    txt+=`⏱ *Horas estudadas:* ${hm}\n`;
-    if(D.aulaItems.length>0){
-      D.aulaItems.forEach(a=>{
-        const h=formatHoursHM(a.hours)+'h';
-        txt+=`   • ${a.title.length>55?a.title.slice(0,53)+'…':a.title}  _(${h})_\n`;
-      });
-    }
-    txt+='\n';
-  }
-  if(D.totalQuestions>0){
-    txt+=`📋 *Questões resolvidas:* ${D.totalQuestions}\n`;
-    txt+=`✅ *Acertos:* ${D.totalCorrect} de ${D.totalQuestions} _(${pct}% de acerto)_\n`;
-    if(D.quizSubjects.length>0) txt+=`📌 *Matérias:* ${D.quizSubjects.join(', ')}\n`;
-    txt+='\n';
-  }
-  txt+=`🏆 #GymRats #EstudosDiários #HoraDeEstudar`;
-  navigator.clipboard?.writeText(txt).then(()=>{
-    const msg=document.getElementById('share-copy-msg');
-    if(msg){ msg.textContent='✅ Texto copiado para a área de transferência!'; setTimeout(()=>msg.textContent='',3000); }
-  }).catch(()=>{
-    const msg=document.getElementById('share-copy-msg');
-    if(msg) msg.textContent='Não foi possível copiar automaticamente.';
-  });
-}
-
 authGate();
 </script>
 
@@ -7064,6 +6960,30 @@ authGate();
   </div>
 </div>
 
+<!-- ═══ COMPARTILHAR MEUS ESTUDOS (card estilo GranCursos) ═══ -->
+<div class="modal-overlay" id="share-modal" onclick="if(event.target===this)closeShareModal()">
+  <div class="share-modal">
+    <div class="modal-hdr">
+      <div><h2>📊 Compartilhar meus estudos</h2><p style="font-size:11px;color:#888;margin-top:2px">Gere um card para postar no GymRats ou compartilhar</p></div>
+      <button class="modal-close" onclick="closeShareModal()">✕</button>
+    </div>
+    <div class="share-modal-body">
+      <div class="form-field">
+        <label>Data</label>
+        <input type="date" id="share-date" onchange="renderShareCard()"/>
+      </div>
+      <div class="share-card-wrap">
+        <canvas id="share-card-canvas" class="share-card-canvas"></canvas>
+      </div>
+      <div class="share-empty-msg" id="share-empty-msg">Nenhum estudo registrado nesse dia — o card ainda pode ser baixado, mas ficará vazio.</div>
+      <div class="share-actions">
+        <button type="button" class="btn-share btn-share-dl" id="btn-share-dl" onclick="downloadShareCard()">💾 Baixar imagem</button>
+        <button type="button" class="btn-share btn-share-copy" id="btn-share-copy" onclick="copyShareText()">📋 Copiar texto</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ DELETE CONFIRM MODAL ═══ -->
 <div class="del-modal-overlay" id="del-confirm-overlay" onclick="if(event.target===this)closDelModal()">
   <div class="del-modal" id="del-confirm-modal">
@@ -7157,28 +7077,309 @@ authGate();
       </div>
     </div>
   </div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// COMPARTILHAR MEUS ESTUDOS — card visual estilo GranCursos
+// ══════════════════════════════════════════════════════════════
+
+// Agrega os registros do Diário (aulas + exercícios) de UMA data específica
+// num resumo pronto para desenhar no card / gerar o texto de compartilhamento.
+function getDayStudySummary(date){
+  const dayLogs = (state.logs||[]).filter(l=>l.date===date);
+  const sm={}; (SECTIONS||[]).forEach(s=>sm[s.id]=s);
+  // Mapa "S{num}" -> seção, para casar os códigos curtos usados nos registros
+  // automáticos de exercícios (l.quizSubjects) com as seções completas.
+  const byShortCode={}; (SECTIONS||[]).forEach(s=>{ byShortCode['S'+s.num]=s; });
+  let totalHours=0, quizAnswered=0;
+  // Chave única por seção (ou rótulo livre) -> rótulo de exibição, evita duplicar
+  // a mesma disciplina quando ela aparece tanto num registro de aula quanto de exercício.
+  const subjectsMap=new Map();
+  const addSubject=(key,label)=>{ if(!subjectsMap.has(key)) subjectsMap.set(key,label); };
+  dayLogs.forEach(l=>{
+    if(l.autoQuiz){
+      quizAnswered += l.quizAnswered||0;
+      (l.quizSubjects||[]).forEach(code=>{
+        const s=byShortCode[code];
+        addSubject(s?s.id:code, s?('S'+s.num+': '+s.title):code);
+      });
+    } else {
+      totalHours += parseFloat(l.hours)||0;
+      if(l.secs && l.secs.length){
+        l.secs.forEach(id=>{ const s=sm[id]; addSubject(id, s?('S'+s.num+': '+s.title):'Estudo geral'); });
+      } else if(l.sec && sm[l.sec]){
+        const s=sm[l.sec]; addSubject(l.sec, 'S'+s.num+': '+s.title);
+      } else {
+        addSubject('__geral__','Estudo geral');
+      }
+    }
+  });
+  return {
+    date,
+    hasAnyLog: dayLogs.length>0,
+    totalHours,
+    quizAnswered,
+    subjects: [...subjectsMap.values()]
+  };
+}
+
+function _shareFormatDate(dateStr){
+  const [y,m,d]=dateStr.split('-').map(Number);
+  const dt=new Date(y,m-1,d);
+  let txt=dt.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  return txt.charAt(0).toUpperCase()+txt.slice(1);
+}
+function _shareFormatHours(h){
+  const totalMin=Math.round((parseFloat(h)||0)*60);
+  const hh=Math.floor(totalMin/60), mm=totalMin%60;
+  if(hh===0) return mm+'m';
+  if(mm===0) return hh+'h';
+  return hh+'h '+mm+'m';
+}
+function _shareUserName(){
+  return (typeof currentUser!=='undefined' && currentUser && currentUser.displayName) ? currentUser.displayName : 'Meus estudos';
+}
+function _shareCourseName(){
+  return (typeof ACTIVE_COURSE!=='undefined' && ACTIVE_COURSE && ACTIVE_COURSE.name) ? ACTIVE_COURSE.name : '';
+}
+
+function _shareRoundRect(ctx,x,y,w,h,r){
+  if(typeof r==='number') r={tl:r,tr:r,br:r,bl:r};
+  ctx.beginPath();
+  ctx.moveTo(x+r.tl,y);
+  ctx.lineTo(x+w-r.tr,y);
+  ctx.arcTo(x+w,y,x+w,y+r.tr,r.tr);
+  ctx.lineTo(x+w,y+h-r.br);
+  ctx.arcTo(x+w,y+h,x+w-r.br,y+h,r.br);
+  ctx.lineTo(x+r.bl,y+h);
+  ctx.arcTo(x,y+h,x,y+h-r.bl,r.bl);
+  ctx.lineTo(x,y+r.tl);
+  ctx.arcTo(x,y,x+r.tl,y,r.tl);
+  ctx.closePath();
+}
+// Quebra texto em várias linhas respeitando maxWidth; devolve o Y final.
+function _shareWrapText(ctx,text,x,y,maxWidth,lineHeight,maxLines){
+  const words=String(text).split(' ');
+  let line='', linesDrawn=0;
+  for(let i=0;i<words.length;i++){
+    const test=line?(line+' '+words[i]):words[i];
+    if(ctx.measureText(test).width>maxWidth && line){
+      ctx.fillText(line,x,y);
+      line=words[i]; y+=lineHeight; linesDrawn++;
+      if(maxLines && linesDrawn>=maxLines-1){
+        // última linha permitida: trunca com reticências se ainda sobrar texto
+        const rest=words.slice(i).join(' ');
+        let last=rest;
+        while(ctx.measureText(last+'…').width>maxWidth && last.length>1){ last=last.slice(0,-1); }
+        ctx.fillText(rest===last?last:last+'…',x,y);
+        return y+lineHeight;
+      }
+    } else { line=test; }
+  }
+  if(line) ctx.fillText(line,x,y);
+  return y+lineHeight;
+}
+
+// Desenha o card completo num canvas já dimensionado (W x H em "pixels de design").
+// `scale` multiplica tudo para exportação em alta resolução (retina 2x).
+function drawShareCard(canvas, W, H, scale, data){
+  canvas.width=W*scale; canvas.height=H*scale;
+  const ctx=canvas.getContext('2d');
+  ctx.setTransform(scale,0,0,scale,0,0);
+  ctx.clearRect(0,0,W,H);
+
+  // Fundo: gradiente escuro/azul estilo GranCursos
+  const bg=ctx.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#0a1128');
+  bg.addColorStop(.55,'#0f2a5c');
+  bg.addColorStop(1,'#144d9c');
+  ctx.fillStyle=bg;
+  ctx.fillRect(0,0,W,H);
+  // Glow decorativo
+  const glow=ctx.createRadialGradient(W*0.85,H*0.06,10,W*0.85,H*0.06,W*0.55);
+  glow.addColorStop(0,'rgba(90,160,255,.35)');
+  glow.addColorStop(1,'rgba(90,160,255,0)');
+  ctx.fillStyle=glow; ctx.fillRect(0,0,W,H);
+
+  const M=34; // margem lateral
+  let y=44;
+
+  // Selo do app
+  ctx.fillStyle='rgba(255,255,255,.12)';
+  _shareRoundRect(ctx,M,y-24,150,30,15); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.font='700 13px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+  ctx.textBaseline='middle';
+  ctx.fillText('🎓 Hora de Estudar',M+13,y-9);
+  ctx.textBaseline='alphabetic';
+
+  y+=42;
+  // Nome do usuário
+  ctx.fillStyle='#fff';
+  ctx.font='800 26px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+  ctx.fillText(_shareUserName(),M,y);
+  y+=27;
+  // Curso
+  const course=_shareCourseName();
+  if(course){
+    ctx.fillStyle='#8fc1ff';
+    ctx.font='700 14px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+    ctx.fillText(course,M,y);
+    y+=18;
+  }
+  // Data
+  ctx.fillStyle='rgba(255,255,255,.6)';
+  ctx.font='600 12px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+  ctx.fillText(_shareFormatDate(data.date),M,y+16);
+
+  y+=48;
+
+  // ── Linha com 3 blocos coloridos ──
+  const gap=12;
+  const blockW=(W-2*M-2*gap)/3;
+  const blockH=100;
+  const blocks=[
+    {icon:'⏱️',value:_shareFormatHours(data.totalHours),label:'Horas Estudadas',color:'#F59E0B'},
+    {icon:'📋',value:String(data.quizAnswered||0),label:'Questões Resolvidas',color:'#8B5CF6'},
+    {icon:'📚',value:String(data.subjects.length||0),label:'Disciplinas Estudadas',color:'#EC4899'},
+  ];
+  blocks.forEach((b,i)=>{
+    const bx=M+i*(blockW+gap), by=y;
+    ctx.fillStyle=_shareHex2rgba(b.color,.16);
+    _shareRoundRect(ctx,bx,by,blockW,blockH,14); ctx.fill();
+    ctx.strokeStyle=_shareHex2rgba(b.color,.4);
+    ctx.lineWidth=1.5; ctx.stroke();
+    ctx.font='22px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+    ctx.fillStyle='#fff';
+    ctx.fillText(b.icon,bx+14,by+36);
+    ctx.font='800 22px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+    ctx.fillStyle='#fff';
+    ctx.fillText(b.value,bx+14,by+66);
+    ctx.font='700 10.5px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+    ctx.fillStyle='rgba(255,255,255,.75)';
+    _shareWrapText(ctx,b.label.toUpperCase(),bx+14,by+84,blockW-20,13,2);
+  });
+  y+=blockH+34;
+
+  // ── Lista de disciplinas estudadas ──
+  ctx.font='700 11px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+  ctx.fillStyle='rgba(255,255,255,.7)';
+  ctx.fillText('DISCIPLINAS ESTUDADAS', M, y);
+  y+=20;
+  ctx.font='600 13px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+  ctx.fillStyle='#fff';
+  if(data.subjects.length){
+    const MAX_SHOW=5;
+    const shown=data.subjects.slice(0,MAX_SHOW);
+    shown.forEach(s=>{
+      ctx.fillStyle='rgba(255,255,255,.9)';
+      ctx.fillText('•  '+s, M, y);
+      y+=20;
+    });
+    if(data.subjects.length>MAX_SHOW){
+      ctx.fillStyle='rgba(255,255,255,.55)';
+      ctx.fillText('+ '+(data.subjects.length-MAX_SHOW)+' outra(s)', M, y);
+      y+=20;
+    }
+  } else {
+    ctx.fillStyle='rgba(255,255,255,.5)';
+    ctx.fillText('Nenhum estudo registrado neste dia', M, y);
+    y+=20;
+  }
+
+  // ── Rodapé com hashtags ──
+  ctx.font='700 13px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+  ctx.fillStyle='#8fc1ff';
+  ctx.textAlign='center';
+  ctx.fillText('#GymRats   #EstudosDiários', W/2, H-26);
+  ctx.textAlign='left';
+}
+function _shareHex2rgba(hex,alpha){
+  const h=hex.replace('#','');
+  const r=parseInt(h.substring(0,2),16), g=parseInt(h.substring(2,4),16), b=parseInt(h.substring(4,6),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// Tamanho de design do card (proporção 4:5, boa para feed/GymRats)
+const SHARE_CARD_W=640, SHARE_CARD_H=560;
+let _shareCurrentData=null;
+
+function openShareModal(){
+  const dateEl=document.getElementById('share-date');
+  if(dateEl) dateEl.value = todayStr();
+  document.getElementById('share-modal').classList.add('open');
+  renderShareCard();
+}
+function closeShareModal(){
+  const m=document.getElementById('share-modal'); if(m) m.classList.remove('open');
+}
+function renderShareCard(){
+  const dateEl=document.getElementById('share-date');
+  const date=dateEl?.value || todayStr();
+  const data=getDayStudySummary(date);
+  _shareCurrentData=data;
+  const canvas=document.getElementById('share-card-canvas');
+  if(canvas) drawShareCard(canvas, SHARE_CARD_W, SHARE_CARD_H, 1, data);
+  const emptyMsg=document.getElementById('share-empty-msg');
+  if(emptyMsg) emptyMsg.style.display = data.hasAnyLog ? 'none' : 'block';
+}
+
+// 💾 Baixar imagem — PNG em alta resolução (retina 2x), funciona em desktop e mobile
+function downloadShareCard(){
+  if(!_shareCurrentData) return;
+  const btn=document.getElementById('btn-share-dl');
+  const offCanvas=document.createElement('canvas');
+  drawShareCard(offCanvas, SHARE_CARD_W, SHARE_CARD_H, 2, _shareCurrentData);
+  offCanvas.toBlob(blob=>{
+    if(!blob){ if(btn){btn.textContent='❌ Erro ao gerar';setTimeout(()=>{btn.textContent='💾 Baixar imagem';},2000);} return; }
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download='hora-de-estudar_'+_shareCurrentData.date+'.png';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+    if(btn){ const orig=btn.innerHTML; btn.innerHTML='✅ Baixado!'; btn.classList.add('copied'); setTimeout(()=>{btn.innerHTML=orig;btn.classList.remove('copied');},2000); }
+  },'image/png',1);
+}
+
+// Monta o texto formatado (Markdown/WhatsApp) do resumo do dia
+function buildShareText(data){
+  let txt=`🎓 *${_shareUserName()}* — Resumo de estudos\n`;
+  const course=_shareCourseName();
+  if(course) txt+=`📘 ${course}\n`;
+  txt+=`📅 ${_shareFormatDate(data.date)}\n\n`;
+  txt+=`⏱️ *Horas estudadas:* ${_shareFormatHours(data.totalHours)}\n`;
+  txt+=`📋 *Questões resolvidas:* ${data.quizAnswered||0}\n`;
+  txt+=`📚 *Disciplinas estudadas:* ${data.subjects.length||0}\n`;
+  if(data.subjects.length){
+    txt+=`\n📚 *Disciplinas:*\n`;
+    data.subjects.forEach(s=>{ txt+=`• ${s}\n`; });
+  }
+  txt+=`\n#GymRats #EstudosDiários`;
+  return txt;
+}
+
+// 📋 Copiar texto — resumo em Markdown/WhatsApp pronto para colar
+function copyShareText(){
+  if(!_shareCurrentData) return;
+  const text=buildShareText(_shareCurrentData);
+  const btn=document.getElementById('btn-share-copy');
+  const done=()=>{ if(btn){ const orig=btn.innerHTML; btn.innerHTML='✅ Copiado!'; btn.classList.add('copied'); setTimeout(()=>{btn.innerHTML=orig;btn.classList.remove('copied');},2000); } };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>_shareFallbackCopy(text,done));
+  } else {
+    _shareFallbackCopy(text,done);
+  }
+}
+// Fallback para navegadores/mobile sem suporte à Clipboard API
+function _shareFallbackCopy(text,done){
+  const ta=document.createElement('textarea');
+  ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try{ document.execCommand('copy'); done(); }catch(e){}
+  document.body.removeChild(ta);
+}
+
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeShareModal(); });
+</script>
 </body>
 </html>
-
-
-<!-- ═══ MODAL: COMPARTILHAR ESTUDOS DO DIA ═══ -->
-<div id="daily-share-overlay" class="goal-modal-overlay" onclick="if(event.target===this)closeDailyShare()" style="z-index:10000">
-  <div style="background:#fff;border-radius:20px;width:100%;max-width:520px;padding:24px 24px 20px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-      <div style="font-size:16px;font-weight:800;color:#1a1a18">📊 Compartilhar Meus Estudos</div>
-      <button onclick="closeDailyShare()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#aaa;line-height:1">✕</button>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-      <label style="font-size:12px;font-weight:700;color:#666">Data:</label>
-      <input type="date" id="share-date-picker" onchange="refreshShareCard()" style="padding:7px 10px;border:1px solid #e8e6e0;border-radius:8px;background:#faf9f7;color:#1a1a18;font-family:inherit;font-size:13px"/>
-    </div>
-    <div style="background:#f5f4f1;border-radius:14px;padding:16px;margin-bottom:16px">
-      <canvas id="share-canvas" style="width:100%;border-radius:10px;display:block"></canvas>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <button onclick="downloadShareCard()" style="padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#185FA5,#0d4a8a);color:#fff;font-size:13px;font-weight:700;cursor:pointer">💾 Baixar imagem</button>
-      <button onclick="copyShareText()" style="padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#1D9E75,#157a5c);color:#fff;font-size:13px;font-weight:700;cursor:pointer">📋 Copiar texto</button>
-    </div>
-    <div id="share-copy-msg" style="text-align:center;font-size:12px;color:#1D9E75;font-weight:700;margin-top:8px;min-height:18px"></div>
-  </div>
-</div>

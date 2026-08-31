@@ -650,18 +650,11 @@ body.focus-mode #focus-mode-btn{
   backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);
   white-space:nowrap;
 }
-#pomo-fab{
-  position:fixed;bottom:80px;right:18px;z-index:9500;
-  width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;
-  background:linear-gradient(135deg,#ef4444,#dc2626);
-  color:#fff;font-size:22px;box-shadow:0 4px 18px rgba(239,68,68,.45);
-  transition:box-shadow .2s;display:flex;align-items:center;justify-content:center;
-  touch-action:none;will-change:transform;
-}
-#pomo-fab:hover{transform:scale(1.1);box-shadow:0 6px 24px rgba(239,68,68,.6)}
-#pomo-fab.running{background:linear-gradient(135deg,#f97316,#ef4444);animation:pomopulse 2s ease-in-out infinite}
-#pomo-fab.break{background:linear-gradient(135deg,#1D9E75,#059669)}
-@keyframes pomopulse{0%,100%{box-shadow:0 4px 18px rgba(239,68,68,.4)}50%{box-shadow:0 4px 28px rgba(239,68,68,.8),0 0 0 8px rgba(239,68,68,.15)}}
+/* Botão do Pomodoro na topbar (mesmo tamanho dos demais botões de ação) */
+#pomo-fab{ background:#ef4444!important; color:#fff!important; }
+#pomo-fab.running{background:linear-gradient(135deg,#f97316,#ef4444)!important;animation:pomopulse 2s ease-in-out infinite}
+#pomo-fab.break{background:linear-gradient(135deg,#1D9E75,#059669)!important}
+@keyframes pomopulse{0%,100%{box-shadow:0 2px 8px rgba(239,68,68,.35)}50%{box-shadow:0 2px 8px rgba(239,68,68,.35),0 0 0 6px rgba(239,68,68,.18)}}
 
 #pomo-widget{
   position:fixed;bottom:144px;right:18px;z-index:9500;
@@ -736,13 +729,9 @@ body.focus-mode #focus-mode-btn{
 #pomo-auto-log{accent-color:#1D9E75;width:14px;height:14px}
 #pomo-cycles-label{font-size:11px;color:#555;font-weight:700}
 
-/* Desktop: widget goes to bottom-right, not overlapping nav */
+/* Desktop: widget do pomodoro fica no canto inferior direito, sem sobrepor a nav */
 @media(min-width:600px){
-  #pomo-fab{bottom:24px;right:24px;z-index:9500}
   #pomo-widget{bottom:90px;right:24px;z-index:9500}
-}
-@media(max-width:599px){
-  #pomo-fab{bottom:72px;right:16px;z-index:9500}
 }
 /* Mobile nav adjust when widget open */
 
@@ -824,6 +813,7 @@ body.focus-mode #focus-mode-btn{
     <span class="badge badge-amber" id="hdr-hours">0h</span>
     <span class="badge" id="hdr-streak" onclick="openStreakModal()" style="cursor:pointer;background:#555;color:#aaa;border:2px dashed rgba(255,255,255,.3);transition:all .2s" title="Streak de dias estudados">💤 0d</span>
     <button id="focus-mode-btn" onclick="toggleFocusMode()" title="Modo Foco — esconde menus para tela cheia">🎯 Foco</button>
+    <button id="pomo-fab" class="btn-export-top btn-top-action" onclick="togglePomoWidget()" title="Cronômetro Pomodoro" data-hint="Cronômetro Pomodoro">🍅 Pomodoro</button>
     <button class="btn-export-top btn-top-action" onclick="openExportGeral()" title="Compartilhe informações do curso" data-hint="Compartilhe informações do curso">📤 Compartilhar</button>
     <button class="btn-export-top btn-top-action" style="background:#185FA5;color:#fff" onclick="openBackup()" title="Exporte ou importe backup do curso" data-hint="Exporte ou importe backup do curso">🔄 Backup</button>
     <span class="badge" id="hdr-user-badge" onclick="openProfileModal()" style="background:transparent;border:1.5px solid rgba(255,255,255,.25);color:#ccc;font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" title="Clique para editar seu perfil">👤</span>
@@ -5286,77 +5276,9 @@ function pomoClampToViewport(w){
   }
 }
 
-// ── POMODORO DRAG (ícone flutuante) ─────────────────────────────
-let _pomoFabDragInited = false;
-function pomoInitFabDrag(){
-  const fab = document.getElementById('pomo-fab');
-  if(!fab || _pomoFabDragInited) return;
-  _pomoFabDragInited = true;
-  fab.style.touchAction = 'none'; // evita o navegador "disputar" o gesto com scroll no mobile (causa de lentidão)
-
-  let dragging=false, moved=false, pointerId=null;
-  let startX=0, startY=0, origLeft=0, origTop=0, fabW=0, fabH=0;
-  let pendingDx=0, pendingDy=0, rafId=null;
-
-  // OBS: a posição NÃO é restaurada de sessões anteriores — a cada novo
-  // carregamento do app, o botão sempre abre no local padrão definido em CSS
-  // (#pomo-fab, com breakpoints diferentes para web e mobile). O arraste só
-  // vale durante a sessão atual da página.
-
-  fab.addEventListener('pointerdown', function(e){
-    try{ fab.setPointerCapture(e.pointerId); }catch(err){}
-    pointerId=e.pointerId;
-    const rect=fab.getBoundingClientRect();
-    fab.style.position='fixed';
-    fab.style.left=rect.left+'px';
-    fab.style.top=rect.top+'px';
-    fab.style.right='auto';
-    fab.style.bottom='auto';
-    fab.style.transform='';
-    origLeft=rect.left; origTop=rect.top;
-    fabW=fab.offsetWidth; fabH=fab.offsetHeight; // ler 1x só (evita reflow repetido a cada movimento)
-    startX=e.clientX; startY=e.clientY;
-    pendingDx=0; pendingDy=0;
-    dragging=true; moved=false;
-  });
-  fab.addEventListener('pointermove', function(e){
-    if(!dragging || e.pointerId!==pointerId) return;
-    const dx=e.clientX-startX, dy=e.clientY-startY;
-    if(!moved && (Math.abs(dx)>4 || Math.abs(dy)>4)) moved=true;
-    if(!moved) return;
-    e.preventDefault();
-    pendingDx=Math.max(8-origLeft, Math.min(dx, window.innerWidth  - fabW - 8 - origLeft));
-    pendingDy=Math.max(8-origTop,  Math.min(dy, window.innerHeight - fabH - 8 - origTop));
-    // Move visualmente via transform (GPU, sem reflow) e só grava o resultado 1x por frame
-    if(rafId==null){
-      rafId=requestAnimationFrame(()=>{
-        rafId=null;
-        fab.style.transform=`translate(${pendingDx}px, ${pendingDy}px)`;
-      });
-    }
-  }, {passive:false});
-  function endDrag(e){
-    if(!dragging) return;
-    dragging=false; pointerId=null;
-    if(rafId!=null){ cancelAnimationFrame(rafId); rafId=null; }
-    if(moved){
-      // Consolida o transform em left/top definitivos (posição válida só
-      // durante esta sessão da página — não é persistida entre recargas)
-      fab.style.transform='';
-      fab.style.left=(origLeft+pendingDx)+'px';
-      fab.style.top =(origTop +pendingDy)+'px';
-    } else {
-      // Foi um clique (sem arrastar): abre/fecha o widget do Pomodoro
-      togglePomoWidget();
-    }
-  }
-  fab.addEventListener('pointerup', endDrag);
-  fab.addEventListener('pointercancel', function(){
-    dragging=false; pointerId=null;
-    if(rafId!=null){ cancelAnimationFrame(rafId); rafId=null; }
-    fab.style.transform='';
-  });
-}
+// O botão do Pomodoro agora é fixo na topbar (mesmo estilo dos demais botões
+// de ação) — não é mais arrastável. Só o painel/widget aberto pode ser
+// arrastado (ver pomoInitDrag, acima).
 
 function togglePomoWidget(){
   _pomo.widgetOpen = !_pomo.widgetOpen;
@@ -5561,9 +5483,9 @@ function pomoRender(){
     btn.textContent = _pomo.running ? '⏸ Pausar' : '▶ Iniciar';
     btn.style.background = _pomo.running ? '#f97316' : POMO_MODES[_pomo.mode].color;
   }
-  // FAB emoji
+  // Botão do Pomodoro na topbar
   const fab = document.getElementById('pomo-fab');
-  if(fab) fab.textContent = _pomo.running ? (pct<.5?'🔥':'⏱') : '🍅';
+  if(fab) fab.textContent = (_pomo.running ? (pct<.5?'🔥':'⏱') : '🍅') + ' Pomodoro';
   // Dots
   const dots = document.getElementById('pomo-dots');
   if(dots){
@@ -6427,7 +6349,6 @@ async function init(){
     const focusBtn=document.getElementById('pomo-m-focus'); if(focusBtn) focusBtn.textContent=POMO_MODES.focus.label;
     if(_pomo.mode==='focus'){ _pomo.remaining=state.pomoFocusMins*60; _pomo.total=state.pomoFocusMins*60; }
   }
-  pomoInitFabDrag();
 
   if(isMobile()){
     document.querySelector('.desktop-wrap').style.display='none';
@@ -7020,8 +6941,7 @@ authGate();
 <!-- ═══ BOTÃO VOLTAR AO TOPO ═══ -->
 <button id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Voltar ao topo">↑</button>
 
-  <!-- POMODORO FAB + WIDGET — sempre último no DOM para máximo z-index -->
-  <button id="pomo-fab" title="Pomodoro Timer (arraste para mover)">🍅</button>
+  <!-- POMODORO WIDGET — sempre último no DOM para máximo z-index (o botão em si agora fica na topbar) -->
   <div id="pomo-widget-wrap">
     <div id="pomo-widget">
       <div id="pomo-drag-handle" class="pomo-header">

@@ -7323,6 +7323,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeShareModal();
 .sr-tile.me video{transform:scaleX(-1)}
 .sr-avatar{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#1b2440}
 .sr-avatar i{width:64px;height:64px;border-radius:50%;background:#2563eb;display:flex;align-items:center;justify-content:center;font-size:26px;font-style:normal;font-weight:800}
+.sr-st{position:absolute;left:8px;right:8px;top:8px;background:rgba(0,0,0,.7);color:#fde68a;font-size:11px;font-weight:600;padding:6px 9px;border-radius:8px;display:none;line-height:1.35}
 .sr-lbl{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.6);padding:3px 9px;border-radius:12px;font-size:12px;font-weight:600;max-width:85%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #sr-side{width:330px;background:#141b30;border-left:1px solid rgba(255,255,255,.08);display:none;flex-direction:column;min-height:0}
 #sr-side.open{display:flex}
@@ -7424,14 +7425,14 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeShareModal();
 const SR_MAX = 8;
 // Opcional: URL de um Cloudflare Worker que devolve {"iceServers":[...]} (servidor TURN).
 // Deixe vazio para usar apenas STUN (funciona na maioria das redes).
-const SR_ICE_ENDPOINT = '';
+const SR_ICE_ENDPOINT = 'https://horadeestudar.willbrasilia.workers.dev/';
 const SR_DEFAULT_ICE = [{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302','stun:stun.cloudflare.com:3478']}];
 
 let SR = srFreshState();
 function srFreshState(){
   return { id:null, room:null, isOwner:false, micTrack:null, camTrack:null, micOn:false, camOn:false,
            peers:{}, parts:{}, unsubs:[], hb:null, iceServers:null, sigChain:Promise.resolve(),
-           earlyIce:{}, panel:null, unread:0, firstParts:true, firstMsgs:true, joinedAt:0 };
+           earlyIce:{}, panel:null, unread:0, firstParts:true, firstMsgs:true, joinedAt:0, seen:{}, lastDocs:[], sweep:null };
 }
 const srEl = id => document.getElementById(id);
 const srTS = () => firebase.firestore.FieldValue.serverTimestamp();
@@ -7538,7 +7539,8 @@ async function srLoadIce(){
   if(!SR_ICE_ENDPOINT) return;
   try{
     const r=await fetch(SR_ICE_ENDPOINT,{cache:'no-store'}); const j=await r.json();
-    if(j && Array.isArray(j.iceServers) && j.iceServers.length) SR.iceServers=j.iceServers.concat(SR_DEFAULT_ICE);
+    if(j && Array.isArray(j.iceServers) && j.iceServers.length){ SR.iceServers=j.iceServers.concat(SR_DEFAULT_ICE); SR.turn=true; console.log('[sala] TURN ativo'); }
+    else console.warn('[sala] Worker não devolveu iceServers — usando só STUN');
   }catch(e){ console.warn('ICE endpoint falhou, usando só STUN',e); }
 }
 async function srJoin(id){
@@ -7563,8 +7565,10 @@ async function srJoin(id){
     srEl('sr-side').classList.remove('open');
     srUpdateButtons();
     const myRef=ref.collection('participants').doc(uid);
+    try{ const old=await ref.collection('signals').where('to','==',uid).get(); await Promise.all(old.docs.map(d=>d.ref.delete())); }catch(e){}
     await myRef.set({name:srName(), joinedAt:srTS(), lastSeen:srTS(), micOn:false, camOn:false});
     SR.hb=setInterval(()=>myRef.update({lastSeen:srTS()}).catch(()=>{}),20000);
+    SR.sweep=setInterval(srRebuildParts,15000);
     SR.unsubs.push(ref.onSnapshot(srOnRoom, e=>console.error('room',e)));
     SR.unsubs.push(ref.collection('participants').onSnapshot(srOnParts, e=>console.error('parts',e)));
     SR.unsubs.push(ref.collection('messages').orderBy('ts').limitToLast(100).onSnapshot(srOnMsgs, e=>console.error('msgs',e)));
@@ -7584,7 +7588,7 @@ async function srLeave(silentMsg){
   if(!SR.id) return;
   const id=SR.id, uid=srUid();
   SR.unsubs.forEach(u=>{ try{u();}catch(e){} });
-  clearInterval(SR.hb);
+  clearInterval(SR.hb); clearInterval(SR.sweep);
   Object.keys(SR.peers).forEach(srClosePeer);
   if(SR.micTrack) SR.micTrack.stop();
   if(SR.camTrack) SR.camTrack.stop();
@@ -7616,11 +7620,21 @@ function srChatBlocked(){ return !SR.isOwner && !!(SR.room && SR.room.chatLocked
 
 function srOnParts(snap){
   if(!SR.id) return;
-  const uid=srUid(); const prev=Object.keys(SR.parts); const next={};
-  snap.docs.forEach(d=>{
-    const x=d.data({serverTimestamps:'estimate'});
-    if(d.id===uid || srIsFresh(x)){
-      const ja=x.joinedAt; next[d.id]={name:x.name||'Aluno',micOn:!!x.micOn,camOn:!!x.camOn,joinedAt:ja&&ja.toMillis?ja.toMillis():0};
+  SR.lastDocs=snap.docs.map(d=>({id:d.id,x:d.data({serverTimestamps:'estimate'})}));
+  srRebuildParts();
+}
+// Um participante está "presente" se o seu lastSeen mudou nos últimos 70s medidos no
+// relógio DESTE navegador (não depende de os relógios dos aparelhos estarem certos).
+function srRebuildParts(){
+  if(!SR.id) return;
+  const uid=srUid(); const prev=Object.keys(SR.parts); const next={}; const now=Date.now();
+  SR.lastDocs.forEach(({id,x})=>{
+    const ls=x.lastSeen&&x.lastSeen.toMillis?x.lastSeen.toMillis():0;
+    const rec=SR.seen[id];
+    if(!rec || rec.ls!==ls) SR.seen[id]={ls,at:now};
+    if(id===uid || now-SR.seen[id].at<70000){
+      const ja=x.joinedAt;
+      next[id]={name:x.name||'Aluno',micOn:!!x.micOn,camOn:!!x.camOn,joinedAt:ja&&ja.toMillis?ja.toMillis():0};
     }
   });
   SR.parts=next;
@@ -7629,15 +7643,14 @@ function srOnParts(snap){
     prev.forEach(u=>{ if(u!==uid && !next[u]) srToast('🚪 Alguém saiu'); });
   }
   SR.firstParts=false;
-  // peers
   Object.keys(SR.peers).forEach(u=>{ if(!next[u]) srClosePeer(u); });
   Object.keys(next).forEach(u=>{
     if(u===uid) return;
     const p=SR.peers[u];
-    if(uid<u){ // eu inicio a conexão
+    if(uid<u){
       if(!p || (next[u].joinedAt && p.joinedAt && next[u].joinedAt!==p.joinedAt)) srStartOffer(u,next[u].joinedAt);
     } else if(p && next[u].joinedAt && p.joinedAt && next[u].joinedAt!==p.joinedAt){
-      srClosePeer(u); // o outro lado reentrou: aguarda nova oferta
+      srClosePeer(u);
     }
   });
   srEl('sr-count').textContent=Object.keys(next).length+' na sala';
@@ -7681,11 +7694,13 @@ function srSignal(to,kind,data){
 }
 function srCreatePeer(remoteUid,sid,joinedAt){
   const pc=new RTCPeerConnection({iceServers:SR.iceServers||SR_DEFAULT_ICE});
-  const p={uid:remoteUid,pc,sid,joinedAt:joinedAt||0,stream:new MediaStream(),pendingIce:[],aSender:null,vSender:null};
+  const p={uid:remoteUid,pc,sid,joinedAt:joinedAt||0,created:Date.now(),stream:new MediaStream(),pendingIce:[],aSender:null,vSender:null};
   pc.onicecandidate=e=>{ if(e.candidate) srSignal(remoteUid,'ice',{sid,c:e.candidate.toJSON()}); };
   pc.ontrack=e=>{ p.stream.addTrack(e.track); srRenderTiles(); };
+  pc.oniceconnectionstatechange=()=>{ console.log('[sala] ice',remoteUid.slice(0,6),pc.iceConnectionState); if(SR.peers[remoteUid]===p) srRenderTiles(); };
   pc.onconnectionstatechange=()=>{
     if(SR.peers[remoteUid]!==p) return;
+    console.log('[sala] conexão',remoteUid.slice(0,6),pc.connectionState); srRenderTiles();
     if(pc.connectionState==='failed' && SR.parts[remoteUid] && srUid()<remoteUid){
       setTimeout(()=>{ if(SR.peers[remoteUid]===p && SR.parts[remoteUid]) srStartOffer(remoteUid,SR.parts[remoteUid].joinedAt); },1500);
     }
@@ -7694,7 +7709,7 @@ function srCreatePeer(remoteUid,sid,joinedAt){
 }
 function srClosePeer(u){
   const p=SR.peers[u]; if(!p) return;
-  try{ p.pc.onicecandidate=null; p.pc.ontrack=null; p.pc.onconnectionstatechange=null; p.pc.close(); }catch(e){}
+  try{ p.pc.onicecandidate=null; p.pc.ontrack=null; p.pc.onconnectionstatechange=null; p.pc.oniceconnectionstatechange=null; p.pc.close(); }catch(e){}
   delete SR.peers[u]; srRenderTiles();
 }
 function srApplySenders(p){
@@ -7720,7 +7735,6 @@ function srOnSignals(snap){
   items.forEach(s=>{
     s.ref.delete().catch(()=>{});
     if(!SR.id) return;
-    if(s.t && s.t < SR.joinedAt-30000) return; // sinal antigo de sessão anterior
     SR.sigChain=SR.sigChain.then(()=>srHandleSignal(s)).catch(e=>console.warn('sig',e));
   });
 }
@@ -7808,7 +7822,8 @@ function srMakeTile(u){
   const v=document.createElement('video'); v.autoplay=true; v.playsInline=true; v.setAttribute('playsinline',''); if(u==='__me__') v.muted=true;
   const av=document.createElement('div'); av.className='sr-avatar'; av.innerHTML='<i></i>';
   const lb=document.createElement('div'); lb.className='sr-lbl';
-  t.append(v,av,lb); return t;
+  const st=document.createElement('div'); st.className='sr-st';
+  t.append(v,av,lb,st); return t;
 }
 function srRenderTiles(){
   const grid=srEl('sr-grid'); if(!grid||!SR.id) return;
@@ -7830,13 +7845,30 @@ function srRenderTiles(){
     if(me){
       const want=SR.camTrack?new MediaStream([SR.camTrack]):null;
       if(!SR.camTrack){ if(v.srcObject) v.srcObject=null; }
-      else if(!v.srcObject || v.srcObject.getVideoTracks()[0]!==SR.camTrack){ v.srcObject=want; v.play&&v.play().catch(()=>{}); }
+      else if(!v.srcObject || v.srcObject.getVideoTracks()[0]!==SR.camTrack){ v.srcObject=want; srPlay(v); }
     } else {
       const p=SR.peers[u];
-      if(p && v.srcObject!==p.stream){ v.srcObject=p.stream; v.play&&v.play().catch(()=>{}); }
+      if(p && v.srcObject!==p.stream){ v.srcObject=p.stream; srPlay(v); }
+      let msg='';
+      if(!p) msg='⏳ Aguardando conexão…';
+      else {
+        const cs=p.pc.connectionState, ics=p.pc.iceConnectionState, age=Date.now()-p.created;
+        if(cs==='connected'||ics==='connected'||ics==='completed') msg='';
+        else if(cs==='failed'||ics==='failed') msg='⚠️ Sem conexão direta — a rede está bloqueando. É preciso ativar o servidor TURN.';
+        else if(cs==='disconnected') msg='🔄 Reconectando…';
+        else msg=age>14000?'⚠️ Demorando para conectar — pode ser bloqueio de rede (firewall).':'🔌 Conectando…';
+      }
+      const st=t.querySelector('.sr-st'); st.textContent=msg; st.style.display=msg?'block':'none';
     }
   });
+  srResumePlayback();
 }
+function srPlay(v){ try{ const r=v.play&&v.play(); if(r&&r.catch) r.catch(()=>{}); }catch(e){} }
+// Navegadores bloqueiam áudio automático sem toque do usuário: retoma a reprodução quando possível.
+function srResumePlayback(){
+  document.querySelectorAll('#sr-grid video').forEach(v=>{ if(v.srcObject && v.paused) srPlay(v); });
+}
+document.addEventListener('click',()=>{ if(SR.id) srResumePlayback(); },true);
 
 // ── PAINEL LATERAL: chat / participantes / controles do admin ─
 function srTogglePanel(which){

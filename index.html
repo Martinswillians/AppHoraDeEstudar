@@ -7538,12 +7538,19 @@ async function srLoadIce(){
   SR.iceServers=SR_DEFAULT_ICE;
   if(!SR_ICE_ENDPOINT) return;
   try{
-    const r=await fetch(SR_ICE_ENDPOINT,{cache:'no-store'}); const j=await r.json();
+    const r=await fetch(SR_ICE_ENDPOINT,{cache:'no-store'}); const txt=await r.text(); let j=null; try{ j=JSON.parse(txt); }catch(e){}
+    if(!(j && Array.isArray(j.iceServers) && j.iceServers.length)) console.warn('[sala] Worker respondeu',r.status,txt.slice(0,400));
     if(j && Array.isArray(j.iceServers) && j.iceServers.length){ SR.iceServers=j.iceServers.concat(SR_DEFAULT_ICE); SR.turn=true; console.log('[sala] TURN ativo'); }
     else console.warn('[sala] Worker não devolveu iceServers — usando só STUN');
   }catch(e){ console.warn('ICE endpoint falhou, usando só STUN',e); }
 }
+let srJoining=false;
 async function srJoin(id){
+  if(srJoining || SR.id) return;
+  srJoining=true;
+  try{ await srJoinInner(id); } finally { srJoining=false; }
+}
+async function srJoinInner(id){
   if(!currentUser){ alert('Faça login para entrar na sala.'); return; }
   if(SR.id) return;
   const uid=srUid(); const ref=fbDb.collection('rooms').doc(id);
@@ -7567,7 +7574,7 @@ async function srJoin(id){
     const myRef=ref.collection('participants').doc(uid);
     try{ const old=await ref.collection('signals').where('to','==',uid).get(); await Promise.all(old.docs.map(d=>d.ref.delete())); }catch(e){}
     await myRef.set({name:srName(), joinedAt:srTS(), lastSeen:srTS(), micOn:false, camOn:false});
-    SR.hb=setInterval(()=>myRef.update({lastSeen:srTS()}).catch(()=>{}),20000);
+    SR.hb=setInterval(srHeartbeat,20000);
     SR.sweep=setInterval(srRebuildParts,15000);
     SR.unsubs.push(ref.onSnapshot(srOnRoom, e=>console.error('room',e)));
     SR.unsubs.push(ref.collection('participants').onSnapshot(srOnParts, e=>console.error('parts',e)));
@@ -7581,6 +7588,20 @@ async function srJoin(id){
     alert('Não foi possível entrar na sala: '+(e.code||e.message)+'\nSe for "permission-denied", atualize as regras do Firestore (coleção rooms).');
     SR=srFreshState(); srEl('sr-overlay').classList.remove('open');
   }
+}
+function srMyRef(){ return fbDb.collection('rooms').doc(SR.id).collection('participants').doc(srUid()); }
+// Se o documento de presença sumir (ex.: apagado por uma sessão antiga), recria — senão você
+// fica "invisível" para os outros mesmo estando na sala.
+function srRecreateSelf(){
+  if(!SR.id || SR.recreating) return;
+  SR.recreating=true;
+  console.warn('[sala] sua presença sumiu do servidor — recriando');
+  srMyRef().set({name:srName(),joinedAt:srTS(),lastSeen:srTS(),micOn:SR.micOn,camOn:SR.camOn})
+    .catch(e=>console.warn('[sala] falha ao recriar presença',e)).then(()=>{ SR.recreating=false; });
+}
+function srHeartbeat(){
+  if(!SR.id) return;
+  srMyRef().update({lastSeen:srTS()}).catch(e=>{ if(e && e.code==='not-found') srRecreateSelf(); });
 }
 function srClearUrl(){ try{ history.replaceState(null,'',location.pathname); }catch(e){} }
 function srOnUnload(){ if(SR.id){ try{ fbDb.collection('rooms').doc(SR.id).collection('participants').doc(srUid()).delete(); }catch(e){} } }
@@ -7621,6 +7642,7 @@ function srChatBlocked(){ return !SR.isOwner && !!(SR.room && SR.room.chatLocked
 function srOnParts(snap){
   if(!SR.id) return;
   SR.lastDocs=snap.docs.map(d=>({id:d.id,x:d.data({serverTimestamps:'estimate'})}));
+  SR.gotParts=true;
   srRebuildParts();
 }
 // Um participante está "presente" se o seu lastSeen mudou nos últimos 70s medidos no
@@ -7628,6 +7650,7 @@ function srOnParts(snap){
 function srRebuildParts(){
   if(!SR.id) return;
   const uid=srUid(); const prev=Object.keys(SR.parts); const next={}; const now=Date.now();
+  if(SR.gotParts && !SR.lastDocs.some(d=>d.id===uid) && now-SR.joinedAt>6000) srRecreateSelf();
   SR.lastDocs.forEach(({id,x})=>{
     const ls=x.lastSeen&&x.lastSeen.toMillis?x.lastSeen.toMillis():0;
     const rec=SR.seen[id];

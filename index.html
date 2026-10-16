@@ -7655,7 +7655,7 @@ function srRebuildParts(){
     const ls=x.lastSeen&&x.lastSeen.toMillis?x.lastSeen.toMillis():0;
     const rec=SR.seen[id];
     if(!rec || rec.ls!==ls) SR.seen[id]={ls,at:now};
-    if(id===uid || now-SR.seen[id].at<70000){
+    if(id===uid || now-SR.seen[id].at<100000){
       const ja=x.joinedAt;
       next[id]={name:x.name||'Aluno',micOn:!!x.micOn,camOn:!!x.camOn,joinedAt:ja&&ja.toMillis?ja.toMillis():0};
     }
@@ -7672,8 +7672,9 @@ function srRebuildParts(){
     const p=SR.peers[u];
     if(uid<u){
       if(!p || (next[u].joinedAt && p.joinedAt && next[u].joinedAt!==p.joinedAt)) srStartOffer(u,next[u].joinedAt);
-    } else if(p && next[u].joinedAt && p.joinedAt && next[u].joinedAt!==p.joinedAt){
-      srClosePeer(u);
+    } else {
+      // Sou quem responde: se não há conexão com este participante, peço uma nova oferta.
+      srRequestOffer(u,p);
     }
   });
   srEl('sr-count').textContent=Object.keys(next).length+' na sala';
@@ -7752,6 +7753,17 @@ async function srStartOffer(remoteUid,joinedAt){
     srSignal(remoteUid,'offer',{sid,desc:{type:offer.type,sdp:offer.sdp},joinedAt:SR.parts[srUid()]&&SR.parts[srUid()].joinedAt});
   }catch(e){ console.error('srStartOffer',e); }
 }
+// Quem tem o uid maior só responde; se perdeu a conexão (ou ela travou), pede ao outro lado para ofertar de novo.
+function srRequestOffer(u,p){
+  const bad = !p || p.pc.connectionState==='failed' || p.pc.connectionState==='closed' ||
+              (p.pc.connectionState!=='connected' && Date.now()-p.created>25000);
+  if(!bad) return;
+  SR.reqAt=SR.reqAt||{};
+  if(Date.now()-(SR.reqAt[u]||0)<8000) return;
+  SR.reqAt[u]=Date.now();
+  console.log('[sala] pedindo nova oferta a',u.slice(0,6));
+  srSignal(u,'req',{});
+}
 function srOnSignals(snap){
   const items=snap.docChanges().filter(c=>c.type==='added').map(c=>({ref:c.doc.ref,...c.doc.data()}));
   items.sort((a,b)=>(a.t||0)-(b.t||0));
@@ -7767,9 +7779,13 @@ async function srFlushIce(p){
 }
 async function srHandleSignal(s){
   const d=JSON.parse(s.data); const from=s.from;
+  if(s.kind==='req'){
+    if(srUid()<from && SR.parts[from]) srStartOffer(from,SR.parts[from].joinedAt);
+    return;
+  }
   if(s.kind==='offer'){
     srClosePeer(from);
-    const partJoined=(SR.parts[from]&&SR.parts[from].joinedAt)||d.joinedAt||0;
+    const partJoined=(SR.parts[from]&&SR.parts[from].joinedAt)||0;
     const p=srCreatePeer(from,d.sid,partJoined);
     await p.pc.setRemoteDescription(d.desc);
     p.pc.getTransceivers().forEach(t=>{

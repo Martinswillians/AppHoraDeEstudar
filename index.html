@@ -7541,7 +7541,7 @@ async function srLoadIce(){
     const r=await fetch(SR_ICE_ENDPOINT,{cache:'no-store'}); const txt=await r.text(); let j=null; try{ j=JSON.parse(txt); }catch(e){}
     if(!(j && Array.isArray(j.iceServers) && j.iceServers.length)) console.warn('[sala] Worker respondeu',r.status,txt.slice(0,400));
     if(j && Array.isArray(j.iceServers) && j.iceServers.length){ SR.iceServers=j.iceServers.concat(SR_DEFAULT_ICE); SR.turn=true; console.log('[sala] TURN ativo'); }
-    else console.warn('[sala] Worker não devolveu iceServers — usando só STUN');
+    else { console.warn('[sala] Worker não devolveu iceServers — usando só STUN'); SR.turn=false; }
   }catch(e){ console.warn('ICE endpoint falhou, usando só STUN',e); }
 }
 let srJoining=false;
@@ -7582,7 +7582,7 @@ async function srJoinInner(id){
     SR.unsubs.push(ref.collection('signals').where('to','==',uid).onSnapshot(srOnSignals, e=>console.error('sigs',e)));
     try{ history.replaceState(null,'',location.pathname+'?sala='+id); }catch(e){}
     window.addEventListener('beforeunload', srOnUnload);
-    srToast('Você entrou na sala. Ative microfone/câmera abaixo.');
+    srToast(SR.turn?'Você entrou na sala. Ative microfone/câmera abaixo.':'⚠️ Você entrou, mas o servidor TURN está inativo — pode falhar entre redes diferentes.');
   }catch(e){
     console.error('srJoin',e);
     alert('Não foi possível entrar na sala: '+(e.code||e.message)+'\nSe for "permission-denied", atualize as regras do Firestore (coleção rooms).');
@@ -7718,8 +7718,15 @@ function srSignal(to,kind,data){
 }
 function srCreatePeer(remoteUid,sid,joinedAt){
   const pc=new RTCPeerConnection({iceServers:SR.iceServers||SR_DEFAULT_ICE});
-  const p={uid:remoteUid,pc,sid,joinedAt:joinedAt||0,created:Date.now(),stream:new MediaStream(),pendingIce:[],aSender:null,vSender:null};
-  pc.onicecandidate=e=>{ if(e.candidate) srSignal(remoteUid,'ice',{sid,c:e.candidate.toJSON()}); };
+  const p={uid:remoteUid,pc,sid,joinedAt:joinedAt||0,created:Date.now(),stream:new MediaStream(),pendingIce:[],aSender:null,vSender:null,cand:{host:0,srflx:0,relay:0},iceErr:[]};
+  pc.onicecandidate=e=>{
+    if(e.candidate){
+      const m=/ typ (host|srflx|prflx|relay)/.exec(e.candidate.candidate||''); const t=m?(m[1]==='prflx'?'srflx':m[1]):null;
+      if(t) p.cand[t]++;
+      srSignal(remoteUid,'ice',{sid,c:e.candidate.toJSON()});
+    } else { console.log('[sala] candidatos locais',remoteUid.slice(0,6),JSON.stringify(p.cand),'TURN:',SR.turn?'ativo':'inativo'); srRenderTiles(); }
+  };
+  pc.onicecandidateerror=e=>{ const s=(e.errorCode||'?')+' '+(e.url||''); if(p.iceErr.length<4) p.iceErr.push(s); console.warn('[sala] erro ICE',e.errorCode,e.errorText||'',e.url||''); };
   pc.ontrack=e=>{ p.stream.addTrack(e.track); srRenderTiles(); };
   pc.oniceconnectionstatechange=()=>{ console.log('[sala] ice',remoteUid.slice(0,6),pc.iceConnectionState); if(SR.peers[remoteUid]===p) srRenderTiles(); };
   pc.onconnectionstatechange=()=>{
@@ -7893,9 +7900,9 @@ function srRenderTiles(){
       else {
         const cs=p.pc.connectionState, ics=p.pc.iceConnectionState, age=Date.now()-p.created;
         if(cs==='connected'||ics==='connected'||ics==='completed') msg='';
-        else if(cs==='failed'||ics==='failed') msg='⚠️ Sem conexão direta — a rede está bloqueando. É preciso ativar o servidor TURN.';
+        else if(cs==='failed'||ics==='failed') msg='⚠️ Sem conexão. '+srDiagText(p);
         else if(cs==='disconnected') msg='🔄 Reconectando…';
-        else msg=age>14000?'⚠️ Demorando para conectar — pode ser bloqueio de rede (firewall).':'🔌 Conectando…';
+        else msg=age>14000?'⚠️ Demorando para conectar. '+srDiagText(p):'🔌 Conectando…';
       }
       const st=t.querySelector('.sr-st'); st.textContent=msg; st.style.display=msg?'block':'none';
     }
@@ -7903,6 +7910,13 @@ function srRenderTiles(){
   srResumePlayback();
 }
 function srPlay(v){ try{ const r=v.play&&v.play(); if(r&&r.catch) r.catch(()=>{}); }catch(e){} }
+function srDiagText(p){
+  const c=p.cand||{host:0,srflx:0,relay:0}; let hint;
+  if(!SR.turn) hint='Servidor TURN INATIVO (o Worker não entregou as credenciais).';
+  else if(!c.relay) hint='TURN ativo, mas este aparelho não conseguiu usá-lo: a rede está bloqueando o servidor TURN.';
+  else hint='TURN ativo e funcionando neste aparelho; o bloqueio parece estar no outro aparelho/rede.';
+  return hint+' [host '+c.host+' · srflx '+c.srflx+' · relay '+c.relay+']';
+}
 // Navegadores bloqueiam áudio automático sem toque do usuário: retoma a reprodução quando possível.
 function srResumePlayback(){
   document.querySelectorAll('#sr-grid video').forEach(v=>{ if(v.srcObject && v.paused) srPlay(v); });
